@@ -388,7 +388,38 @@ async function prepPhoto(file, stamp){
 // ---------- Estado ----------
 let db = null, assets = null, downloads = null, user = null, myId = null;
 const STANDALONE = !(window.claude && typeof window.claude.use === "function");
-let dbState = STANDALONE ? "local" : "connecting"; // connecting | ok | none | local
+// Supabase (só fora do Claude). A chave publicável pode ficar no código: as tabelas são fechadas e
+// toda leitura e gravação passa por funções que exigem o código da equipe.
+const SB = {url: "https://ubnajxrxixdkxfdshcha.supabase.co", key: "sb_publishable_8njCgpUPvXyN4GshNIyc4Q_j-u-HK35"};
+const SUPA = STANDALONE && !!SB.url && !!SB.key;
+let sbAuth = null, sbLast = null, sbSyncing = false;
+const sbUrlCache = {};
+async function sbRpc(fn, args){
+  const r = await fetch(`${SB.url}/rest/v1/rpc/${fn}`, {method:"POST", headers:{apikey:SB.key, "Content-Type":"application/json"}, body:JSON.stringify(args)});
+  if (!r.ok){
+    let msg = ""; try { const j = await r.json(); msg = j.message || j.error || ""; } catch {}
+    const e = new Error(msg || ("http_" + r.status)); e.status = r.status;
+    e.code = /codigo_invalido/.test(msg) ? "codigo_invalido" : (r.status >= 500 ? "servidor" : "http"); throw e;
+  }
+  const t = await r.text(); return t ? JSON.parse(t) : null;
+}
+async function sbFotos(acao, params, body, isJson){
+  const qs = new URLSearchParams(Object.assign({acao}, params || {}));
+  const r = await fetch(`${SB.url}/functions/v1/rocada-fotos?${qs}`, {method:"POST",
+    headers:{apikey:SB.key, "x-codigo-equipe":sbAuth?.codigo || "", "Content-Type": isJson ? "application/json" : "image/jpeg"}, body});
+  let j = null; try { j = await r.json(); } catch {}
+  if (!r.ok){ const e = new Error(j?.erro || ("http_" + r.status)); e.code = j?.erro === "codigo_invalido" ? "codigo_invalido" : "http"; throw e; }
+  return j || {};
+}
+async function sbSignedUrls(paths){
+  const now = Date.now(), need = paths.filter(p => !(sbUrlCache[p] && sbUrlCache[p].exp > now));
+  for (let i = 0; i < need.length; i += 200){
+    const j = await sbFotos("urls", {}, JSON.stringify({paths: need.slice(i, i+200)}), true);
+    Object.entries(j.urls || {}).forEach(([p, u]) => { sbUrlCache[p] = {url:u, exp: now + 50*60*1000}; });
+  }
+  const m = {}; paths.forEach(p => { if (sbUrlCache[p]) m[p] = sbUrlCache[p].url; }); return m;
+}
+let dbState = SUPA ? "connecting" : (STANDALONE ? "local" : "connecting"); // connecting | ok | none | local | login
 let deleted = new Set(LS.get("rocada.deleted", []));
 const saveDeleted = () => LS.set("rocada.deleted", Array.from(deleted));
 let readOnly = false, flushing = false, lastErr = "";
@@ -417,34 +448,51 @@ function applyFoto(id, n, assetId){
   });
   savePending();
 }
+async function uploadFoto(id, n, blob){
+  if (assets){ const up = await assets.upload(blob, {type:"image/jpeg"}); return up.id; }
+  if (SUPA && sbAuth){ const j = await sbFotos("enviar", {area:id, ponto:String(n)}, blob, false); return "sb:" + j.path; }
+  return null;
+}
+async function saveRemote(id, body){
+  if (db) return db.doc("areas/" + id).set(body);
+  const em = await sbRpc("rocada_salvar", {p_codigo:sbAuth.codigo, p_id:id, p_dados:body, p_autor:sbAuth.nome});
+  areas[id] = body; sbCacheSave();
+  return em;
+}
 async function flush(){
-  if (flushing || !db || readOnly) return;
+  if (flushing || readOnly || !(db || (SUPA && sbAuth && dbState === "ok"))) return;
   flushing = true; lastErr = ""; renderSync();
   try {
+    let semRede = false;
     for (const id of Object.keys(pending)){
       const first = pending[id];
-      if (assets){
+      if (assets || SUPA){
         for (const p of (first.pontos || [])){
           if (!p.fotoPend) continue;
           const key = id + "|" + p.n;
           const blob = await idbGet(key);
           if (!blob) continue;
           try {
-            const up = await assets.upload(blob, {type:"image/jpeg"});
-            applyFoto(id, p.n, up.id);
-            await idbDel(key);
+            const fid = await uploadFoto(id, p.n, blob);
+            if (fid){ applyFoto(id, p.n, fid); await idbDel(key); }
           } catch (e) {
             if (e?.code === "quota_or_state") lastErr = "Espaço de fotos esgotado";
+            if (e?.code === "codigo_invalido"){ sbLogout("O código da equipe mudou. Entre de novo."); return; }
+            if (SUPA && e?.code !== "quota_or_state"){ lastErr = e?.code === "http" ? "Foto recusada pelo servidor" : "Sem conexão"; semRede = true; break; }
           }
         }
+        if (semRede) break;
       }
       const rec = pending[id]; if (!rec) continue;
       const v = rec._v, body = clone(rec); delete body._v;
       try {
-        await db.doc("areas/" + id).set(body);
+        await saveRemote(id, body);
         if (pending[id] && pending[id]._v === v) delete pending[id];
         savePending();
+        if (SUPA && ui.view === "area" && ui.id === id && !pending[id] && !saveT){ const sm = $("#savedmsg"); if (sm) sm.textContent = "Enviado"; }
       } catch (e) {
+        if (e?.code === "codigo_invalido"){ sbLogout("O código da equipe mudou. Entre de novo."); return; }
+        if (SUPA && e?.status === 400){ lastErr = `${id} recusada pelo servidor`; continue; }
         if (e?.code === "invalid_argument"){ readOnly = true; lastErr = "Seu acesso não permite enviar"; break; }
         if (e?.code === "quota_exceeded"){ lastErr = "Banco cheio"; break; }
         lastErr = "Sem conexão"; break;
@@ -474,7 +522,8 @@ function renderSync(){
   const n = Object.keys(pending).length;
   el.className = "sync";
   let txt;
-  if (dbState === "connecting") txt = "Conectando…";
+  if (dbState === "login") txt = "Entrar";
+  else if (dbState === "connecting") txt = n ? `Conectando… · ${n} a enviar` : "Conectando…";
   else if (dbState === "local"){ txt = n ? `Modo local · ${n} editada${n > 1 ? "s" : ""}` : "Modo local"; }
   else if (dbState === "none"){ el.classList.add("off"); txt = n ? `${n} só no aparelho` : "Só neste aparelho"; }
   else if (flushing) { el.classList.add("pend"); txt = "Enviando…"; }
@@ -484,8 +533,80 @@ function renderSync(){
   el.title = dbState === "local" ? "Os dados ficam neste aparelho. Exporte a planilha para consolidar." : (n ? "Toque para enviar agora" : "");
 }
 
+// ---------- Entrada no Supabase ----------
+function renderLogin(msg){
+  ui.view = "lista"; dbState = "login"; renderTop();
+  $("#app").innerHTML = `<form class="panel fs" id="loginf" style="margin-top:18px">
+    <h2>Entrar na equipe</h2>
+    <p style="margin:0">Os dados da vistoria ficam guardados no Supabase e são compartilhados com a equipe. Digite o código que o responsável passou e o seu nome. Isso é pedido só uma vez neste aparelho.</p>
+    ${msg ? `<div class="banner">${esc(msg)}</div>` : ""}
+    <div class="field"><label class="req" for="lg-cod">Código da equipe</label><input type="text" id="lg-cod" autocomplete="off" autocapitalize="none" spellcheck="false" placeholder="ex.: rocada-xxxx-xxxx" required></div>
+    <div class="field"><label class="req" for="lg-nome">Seu nome</label><input type="text" id="lg-nome" autocomplete="name" value="${esc(LS.get("rocada.avaliador",""))}" required><span class="hint">Aparece como autor de cada alteração.</span></div>
+    <div class="row"><button class="btn primary" type="submit" id="lg-btn">Entrar</button></div></form>`;
+  $("#lg-cod")?.focus();
+}
+document.addEventListener("submit", async (ev) => {
+  if (ev.target.id !== "loginf") return;
+  ev.preventDefault();
+  const codigo = ($("#lg-cod").value || "").trim(), nome = ($("#lg-nome").value || "").trim();
+  if (!codigo || !nome){ toast("Preencha o código e o seu nome."); return; }
+  const b = $("#lg-btn"); b.disabled = true; b.textContent = "Conferindo…";
+  try {
+    const ok = await sbRpc("rocada_validar", {p_codigo:codigo});
+    if (!ok){ b.disabled = false; b.textContent = "Entrar"; toast("Código incorreto. Confira com o responsável."); return; }
+    sbAuth = {codigo, nome}; LS.set("rocada.sb", sbAuth); LS.set("rocada.avaliador", nome); myId = nome;
+    dbState = "connecting"; renderTop(); renderList(); await sbStart();
+  } catch {
+    b.disabled = false; b.textContent = "Entrar";
+    toast("Sem conexão com o servidor. Tente de novo com sinal.", 5000);
+  }
+});
+function sbLogout(msg){
+  sbAuth = null; LS.set("rocada.sb", null); myId = null; renderLogin(msg || "");
+}
+const tms = v => Date.parse(String(v || "").replace(/(\.\d{3})\d+/, "$1").replace(" ", "T"));
+function sbCacheSave(){ LS.set("rocada.cache", {last: sbLast, areas}); }
+async function sbSync(full){
+  if (!SUPA || !sbAuth || sbSyncing) return;
+  sbSyncing = true;
+  try {
+    const desde = (full || !sbLast || isNaN(tms(sbLast))) ? null : new Date(tms(sbLast) - 120000).toISOString();
+    const rows = await sbRpc("rocada_listar", {p_codigo:sbAuth.codigo, p_desde:desde});
+    if (desde){
+      const del = await sbRpc("rocada_excluidas", {p_codigo:sbAuth.codigo, p_desde:desde});
+      (del || []).forEach(x => { delete areas[x.area_id]; });
+    }
+    const next = desde ? Object.assign({}, areas) : {};
+    (rows || []).forEach(r => { next[r.id] = r.dados; if (!sbLast || tms(r.atualizado_em) > tms(sbLast)) sbLast = r.atualizado_em; });
+    if (!desde && !(rows || []).length){
+      // banco vazio: carrega a base inicial do repositório
+      const rs = await fetch("data/areas.json", {cache:"no-cache"});
+      if (rs.ok){
+        const lista = await rs.json();
+        const n = await sbRpc("rocada_importar", {p_codigo:sbAuth.codigo, p_lista:lista, p_autor:sbAuth.nome});
+        toast(`${n} áreas da base carregadas no Supabase`);
+        sbSyncing = false; return sbSync(true);
+      }
+    }
+    dbState = "ok"; lastErr = "";
+    applyAreas(next);
+    sbCacheSave();
+  } catch (e) {
+    if (e?.code === "codigo_invalido"){ sbSyncing = false; return sbLogout("O código da equipe mudou. Entre de novo."); }
+    lastErr = "Sem conexão"; if (dbState !== "ok") dbState = "connecting";
+    renderSync();
+  } finally { sbSyncing = false; }
+}
+async function sbStart(){
+  if (!Object.keys(areas).length){ const c = LS.get("rocada.cache", null); if (c && c.areas){ areas = c.areas; sbLast = c.last || null; } }
+  renderSync(); if (ui.view === "lista") renderList(); else if (ui.view === "area" && getRec(ui.id)) openArea(ui.id);
+  await sbSync(!sbLast);
+  flush();
+}
+
 // ---------- Lista ----------
 function renderList(){
+  if (SUPA && !sbAuth) return renderLogin("");
   const app = $("#app");
   const ids = allIds();
   const recs = ids.map(getRec);
@@ -544,6 +665,7 @@ function renderList(){
       <div class="chips" role="group" aria-label="Filtrar por situação">${[["todas","Todas"],["cad","Falta cadastro"],["diag","Falta diagnóstico"],["fotos","Faltam fotos"],["ok","Completas"]].map(([k,l]) => `<button class="chip" data-act="filtro" data-v="${k}" aria-pressed="${ui.filtro === k}">${l}</button>`).join("")}</div>
       <div class="list">${rows.map(cardHTML).join("") || `<div class="empty">Nenhuma área com esse filtro.</div>`}</div>`;
   }
+  if (SUPA && sbAuth) h += `<div class="panel row" style="justify-content:space-between"><span class="saved">Conectado à equipe como <b>${esc(sbAuth.nome)}</b>. Os dados ficam no Supabase; uma cópia fica neste aparelho para uso sem sinal.</span><button class="btn sm ghost" data-act="sair">Sair</button></div>`;
   h += `<details class="panel"><summary>Como as notas viram classe</summary>
     <p>A prévia usa os mesmos pesos e regras da planilha: crescimento 25%, criticidade 20%, risco 15%, vegetação 15%, histórico 10%, clima 10%, condição 5%. Índice ≥ 80 = A, 60 a 79 = B, 40 a 59 = C, 20 a 39 = D, abaixo de 20 = E. Criticidade ou risco 5 leva no mínimo a B; criticidade e risco até 2 limitam a D.</p>
     <p style="margin-bottom:0">A classe oficial continua sendo a da planilha, depois da validação.</p></details>`;
@@ -601,6 +723,7 @@ function updateHead(){
 }
 async function resolveBy(){
   const id = draft?.meta?.por; const el = $("#byname");
+  if (el && id && SUPA){ el.textContent = " por " + id; return; }
   if (!el || !id || !user) return;
   try { const ps = await user.profiles([id]); const nm = ps[id]?.name; if (nm && $("#byname")) $("#byname").textContent = " por " + nm; } catch {}
 }
@@ -746,11 +869,14 @@ function dangerHTML(){
 }
 async function refreshPhotos(){
   if (!draft) return;
+  const sbp = (draft.pontos || []).filter(p => !p.fotoPend && String(p.foto || "").startsWith("sb:")).map(p => p.foto.slice(3));
+  if (SUPA && sbp.length){ try { await sbSignedUrls(sbp); } catch {} }
   for (const p of (draft.pontos || [])){
     const el = $("#ph-" + p.n); if (!el) continue;
     let src = null;
     if (p.fotoPend) src = await localPhotoURL(draft.id + "|" + p.n);
-    if (!src && p.foto) src = "/_blob/" + p.foto;
+    if (!src && p.foto && String(p.foto).startsWith("sb:")){ try { const u = await sbSignedUrls([p.foto.slice(3)]); src = u[p.foto.slice(3)] || null; } catch {} }
+    else if (!src && p.foto) src = "/_blob/" + p.foto;
     if (src){ el.innerHTML = ""; const im = new Image(); im.alt = `Foto do ponto P${String(p.n).padStart(2,"0")}`; im.src = src; im.onerror = () => { el.textContent = "foto indisponível"; }; el.appendChild(im); }
     else if (p.foto || p.fotoPend) el.textContent = "foto indisponível";
   }
@@ -767,7 +893,8 @@ document.addEventListener("click", async (ev) => {
   const b = ev.target.closest("[data-act]"); if (!b) return;
   const a = b.dataset.act;
   if (a === "home") return goHome();
-  if (a === "flush"){ if (dbState === "local"){ toast("Modo local: os dados ficam neste aparelho. Use Exportar planilha para consolidar.", 5000); return; } if (Object.keys(pending).length) { flush(); toast("Enviando o que está no aparelho…"); } return; }
+  if (a === "sair"){ if (Object.keys(pending).length){ toast("Há alterações ainda não enviadas. Conecte-se e envie antes de sair.", 5000); return; } return sbLogout(""); }
+  if (a === "flush"){ if (SUPA && !sbAuth) return renderLogin(""); if (SUPA && dbState === "ok"){ sbSync(); flush(); toast(Object.keys(pending).length ? "Enviando e atualizando…" : "Atualizando com a equipe…"); return; } if (dbState === "local"){ toast("Modo local: os dados ficam neste aparelho. Use Exportar planilha para consolidar.", 5000); return; } if (Object.keys(pending).length) { flush(); toast("Enviando o que está no aparelho…"); } return; }
   if (a === "open") return openArea(b.dataset.id);
   if (a === "new"){ newForm = true; renderList(); return; }
   if (a === "cancelnew"){ newForm = false; renderList(); return; }
@@ -887,14 +1014,16 @@ async function deleteArea(id){
   const r = getRec(id);
   try {
     if (db) await db.doc("areas/" + id).delete();
+    else if (SUPA){ if (dbState !== "ok") throw new Error("offline"); await sbRpc("rocada_excluir", {p_codigo:sbAuth.codigo, p_id:id, p_autor:sbAuth.nome}); }
     else if (dbState === "local") { deleted.add(id); saveDeleted(); }
     else if (areas[id]) throw new Error("offline");
   } catch { toast("Não consegui excluir agora. Tente com conexão."); return; }
   for (const p of (r?.pontos || [])){
     if (p.foto && assets){ try { await assets.delete(p.foto); } catch {} }
+    if (p.foto && SUPA && String(p.foto).startsWith("sb:")){ try { await sbFotos("excluir", {}, JSON.stringify({paths:[p.foto.slice(3)]}), true); } catch {} }
     await idbDel(id + "|" + p.n);
   }
-  delete pending[id]; savePending(); delete areas[id];
+  delete pending[id]; savePending(); delete areas[id]; if (SUPA) sbCacheSave();
   toast(`Área ${id} excluída`);
   draft = null; ui.view = "lista"; ui.id = null; saveUI(); renderTop(); renderList();
 }
@@ -993,13 +1122,21 @@ async function exportZip(){
     const zip = new window.JSZip();
     let n = 0, falhas = 0;
     const lines = ["arquivo;id_area;ponto;latitude;longitude;direcao;referencia"];
+    if (SUPA){
+      const sbp = []; allIds().forEach(id => (getRec(id).pontos || []).forEach(p => { if (String(p.foto || "").startsWith("sb:")) sbp.push(p.foto.slice(3)); }));
+      if (sbp.length){ try { await sbSignedUrls(sbp); } catch {} }
+    }
     for (const id of allIds()){
       const r = getRec(id);
       for (const p of (r.pontos || [])){
         if (!p.foto && !p.fotoPend) continue;
         const nn = String(p.n).padStart(2,"0");
         let blob = p.fotoPend ? await idbGet(id + "|" + p.n) : null;
-        if (!blob && p.foto){ try { const rs = await fetch("/_blob/" + p.foto); if (rs.ok) blob = await rs.blob(); } catch {} }
+        if (!blob && p.foto){ try {
+          let u = "/_blob/" + p.foto;
+          if (String(p.foto).startsWith("sb:")){ const m = await sbSignedUrls([p.foto.slice(3)]); u = m[p.foto.slice(3)]; }
+          if (u){ const rs = await fetch(u); if (rs.ok) blob = await rs.blob(); }
+        } catch {} }
         const fname = `${id}_P${nn}_REF.jpg`;
         if (!blob){ falhas++; continue; }
         zip.file(`${r.setor ? r.setor.replace(/[^\w.-]+/g,"_") + "/" : ""}${fname}`, blob);
@@ -1066,7 +1203,10 @@ $("#fileImp").addEventListener("change", async (ev) => {
 function onAreas(snap){
   const next = {};
   snap.docs.forEach(d => { next[d.id] = d.data(); });
-  areas = next; dbState = "ok"; renderSync();
+  dbState = "ok"; applyAreas(next);
+}
+function applyAreas(next){
+  areas = next; renderSync();
   if (ui.view === "lista") { if (!document.activeElement || document.activeElement.id !== "q") renderList(); }
   else if (ui.view === "area" && draft){
     const rem = areas[ui.id];
@@ -1079,9 +1219,25 @@ function onAreas(snap){
   }
 }
 async function boot(){
+  if (SUPA){
+    deleted.clear();
+    sbAuth = LS.get("rocada.sb", null);
+    if (sbAuth && sbAuth.codigo) myId = sbAuth.nome; else sbAuth = null;
+    const c = LS.get("rocada.cache", null);
+    if (sbAuth && c && c.areas){ areas = c.areas; sbLast = c.last || null; }
+  }
   renderTop();
   if (ui.view === "area" && ui.id && getRec(ui.id)) openArea(ui.id); else { ui.view = "lista"; renderList(); }
   const C = window.claude;
+  if (SUPA){
+    if ("serviceWorker" in navigator && location.protocol === "https:"){ navigator.serviceWorker.register("sw.js").catch(() => {}); }
+    if (!sbAuth){ renderLogin(""); return; }
+    await sbStart();
+    setInterval(() => { if (document.visibilityState === "visible" && navigator.onLine !== false){ sbSync(); if (Object.keys(pending).length) flush(); } }, 60000);
+    document.addEventListener("visibilitychange", () => { if (document.visibilityState === "visible") sbSync(); });
+    window.addEventListener("online", () => { sbSync().then(() => flush()); });
+    return;
+  }
   if (STANDALONE){
     try {
       const rs = await fetch("data/areas.json", {cache: "no-cache"});

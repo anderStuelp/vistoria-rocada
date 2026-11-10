@@ -32,13 +32,37 @@ O tipo de área foi sugerido pelo nome e deve ser confirmado na vistoria. Nos tr
 
 ## Onde ficam os dados
 
-Aberto por este endereço, o app funciona em **modo local**: tudo o que você preenche (e as fotos) fica salvo **no próprio celular**, no navegador. Não há servidor nem banco compartilhado.
+Os dados ficam no **Supabase** e são compartilhados pela equipe.
 
-- Para juntar o trabalho da equipe, cada pessoa usa **Exportar planilha** (Excel com as abas BASE_AREAS, DIAGNOSTICO, HISTORICO, PONTOS_EVIDENCIA e PREVIA_CLASSE) e **Exportar fotos** (.zip com as fotos nomeadas no padrão `ID_Pnn_REF.jpg`).
-- A aba LEIA_ME do Excel exportado explica quais colunas colar na planilha de diagnóstico, para não sobrescrever as fórmulas.
-- Limpar os dados do navegador apaga o que não foi exportado. Exporte ao fim de cada dia de campo.
+- No primeiro acesso, o app pede o **código da equipe** e o **seu nome**. O código é passado pelo responsável e não fica neste repositório. O nome aparece como autor de cada alteração.
+- Cada alteração é salva primeiro no celular e enviada assim que houver sinal. Sem sinal, o app continua funcionando e mostra quantas áreas estão "a enviar".
+- As fotos vão para um armazenamento privado no Supabase. Só quem tem o código da equipe consegue vê-las.
+- O app busca as alterações da equipe a cada minuto, ao voltar para a tela e ao tocar no indicador de envio no topo.
+- Na primeira entrada com o banco vazio, o app carrega as 186 áreas de `data/areas.json`.
+- **Exportar planilha** e **Exportar fotos** continuam disponíveis para consolidar na planilha de diagnóstico.
 
-Dentro do Claude, o mesmo app usa um banco compartilhado, guarda as fotos na nuvem e sincroniza a equipe automaticamente.
+### Como o acesso é protegido
+
+O repositório é público e a chave do Supabase no `index.html` é a chave publicável, feita para ficar no navegador. Ela sozinha não abre nada:
+
+- As tabelas têm RLS ativo e nenhuma política, então não podem ser lidas nem gravadas diretamente.
+- Toda leitura e gravação passa por funções do banco (`rocada_listar`, `rocada_salvar`, `rocada_excluir`…) que conferem o código da equipe. O banco guarda só o hash do código.
+- As fotos ficam em um bucket privado e só saem por links temporários (1 hora), gerados pela função `rocada-fotos` depois de conferir o código.
+- Toda gravação e exclusão fica registrada em `historico_alteracoes`, com autor e conteúdo.
+
+### Trocar o código da equipe
+
+No SQL Editor do Supabase:
+
+```sql
+select public.rocada_trocar_codigo('código-atual', 'código-novo');
+```
+
+Quem estiver com o código antigo volta para a tela de entrada na próxima sincronização. O que estiver salvo no celular e ainda não enviado não se perde: é enviado depois que a pessoa entra com o código novo.
+
+### Projeto gratuito do Supabase
+
+No plano gratuito, o projeto é pausado depois de 7 dias sem uso. Se o app mostrar "Conectando…" por muito tempo, abra o painel do Supabase e reative o projeto. Os dados não se perdem.
 
 ## Estrutura do repositório
 
@@ -53,7 +77,7 @@ Dentro do Claude, o mesmo app usa um banco compartilhado, guarda as fotos na nuv
 
 ## Atualizar a base de áreas
 
-Edite `data/areas.json` (um objeto por área, com o mesmo formato dos que já estão lá) e faça o commit. Na próxima vez que o celular abrir o app com sinal, ele carrega a base nova. O que já foi editado no aparelho continua valendo para aquela área.
+`data/areas.json` só é usado para carregar o banco quando ele está vazio. Depois disso, a base fica no Supabase: para incluir áreas novas, use **+ Nova área** ou **Importar cadastro** (Excel ou CSV) no próprio app.
 
 ## Bibliotecas
 

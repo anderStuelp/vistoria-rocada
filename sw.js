@@ -1,5 +1,5 @@
 // Service worker do Vistoria de Roçada: deixa o app abrir sem sinal depois do primeiro acesso.
-const CACHE = "vistoria-rocada-v1";
+const CACHE = "vistoria-rocada-v2";
 const LOCAL = ["./", "index.html", "data/areas.json", "manifest.webmanifest", "icon-192.png", "icon-512.png"];
 const CDN = [
   "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js",
