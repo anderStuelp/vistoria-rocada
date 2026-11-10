@@ -1,0 +1,1106 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<meta name="theme-color" content="#1E5A3D">
+<meta name="description" content="App de campo para a vistoria e o diagnóstico da roçada sistemática de áreas verdes.">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png" type="image/png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<style>:root{color-scheme:light;box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}html{scroll-padding-top:env(safe-area-inset-top,0px)}body{margin:0;padding:0;font:14px -apple-system,BlinkMacSystemFont,sans-serif}img{max-width:100%}[hidden]{display:none!important}</style>
+<title>Vistoria de Roçada</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@600;700&family=IBM+Plex+Mono:wght@500&display=swap">
+</head>
+<body>
+<style>
+/* Layout: coluna única de celular (máx. 760px), barra superior fixa com status de envio; editor em 4 abas que seguem a planilha. */
+:root{
+  --bg:#EEF2EC; --surface:#FFFFFF; --sunk:#E3E9E1; --ink:#14201A; --muted:#55655B; --line:#CBD5C9;
+  --brand:#1E5A3D; --on-brand:#FFFFFF; --accent:#D9480F; --on-accent:#FFFFFF;
+  --ok:#2B7A4B; --warn:#A86A12; --crit:#B3261E;
+  --cA:#B3261E; --cB:#D9480F; --cC:#B7860B; --cD:#2B7A4B; --cE:#2F6CA8; --on-cls:#FFFFFF;
+  --f-display:"Barlow Condensed","Arial Narrow",Arial,sans-serif;
+  --f-body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;
+  --f-mono:"IBM Plex Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){ :root:not([data-theme="light"]){
+  --bg:#0E1411; --surface:#16201B; --sunk:#1D2923; --ink:#E6EEE8; --muted:#9BAAA1; --line:#2C3A33;
+  --brand:#74C69A; --on-brand:#0B1A12; --accent:#FF7B3D; --on-accent:#1A0B03;
+  --ok:#6FD39A; --warn:#E8B04B; --crit:#FF8A80;
+  --cA:#FF6B5E; --cB:#FF8C4A; --cC:#E8B04B; --cD:#6FD39A; --cE:#7DB4F0; --on-cls:#0B1A12; color-scheme:dark } }
+:root[data-theme="dark"]{
+  --bg:#0E1411; --surface:#16201B; --sunk:#1D2923; --ink:#E6EEE8; --muted:#9BAAA1; --line:#2C3A33;
+  --brand:#74C69A; --on-brand:#0B1A12; --accent:#FF7B3D; --on-accent:#1A0B03;
+  --ok:#6FD39A; --warn:#E8B04B; --crit:#FF8A80;
+  --cA:#FF6B5E; --cB:#FF8C4A; --cC:#E8B04B; --cD:#6FD39A; --cE:#7DB4F0; --on-cls:#0B1A12; color-scheme:dark }
+*{box-sizing:border-box}
+body{background:var(--bg);color:var(--ink);font-family:var(--f-body);font-size:16px;line-height:1.45}
+button,input,select,textarea{font:inherit;color:inherit}
+button{cursor:pointer}
+:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+.mono{font-family:var(--f-mono);font-size:.92em}
+.wrap{max-width:760px;margin:0 auto;padding-inline:16px;padding-block:14px 120px}
+.topbar{position:sticky;top:env(safe-area-inset-top,0px);z-index:20;background:var(--brand);color:var(--on-brand)}
+.topbar .in{max-width:760px;margin:0 auto;padding:10px 16px;display:flex;align-items:center;gap:10px;flex-wrap:wrap}
+.brand{font-family:var(--f-display);font-weight:700;font-size:22px;letter-spacing:.02em;text-transform:uppercase;line-height:1;display:flex;gap:8px;align-items:baseline;min-width:0}
+.brand small{font-family:var(--f-body);font-weight:400;font-size:12px;text-transform:none;letter-spacing:0;opacity:.85}
+@media (max-width:480px){.brand small{display:none}.brand{font-size:20px}}
+.topbar .in{flex-wrap:nowrap}
+.sync{margin-left:auto;display:flex;align-items:center;gap:6px;border:1.5px solid color-mix(in srgb,var(--on-brand) 45%,transparent);border-radius:999px;padding:5px 10px;font-size:13px;background:transparent;color:var(--on-brand)}
+.sync .dot{width:9px;height:9px;border-radius:50%;background:var(--on-brand);opacity:.7}
+.sync.pend .dot{background:var(--accent);opacity:1}
+.sync.off .dot{background:var(--warn);opacity:1}
+.back{background:transparent;border:0;color:var(--on-brand);font-size:15px;padding:4px 6px 4px 0;display:flex;align-items:center;gap:4px}
+h1,h2,h3{font-family:var(--f-display);font-weight:700;letter-spacing:.01em;text-wrap:balance;margin:0}
+h2{font-size:24px} h3{font-size:19px}
+.label-up{font-size:12px;text-transform:uppercase;letter-spacing:.08em;color:var(--muted);font-weight:700}
+.banner{border:1.5px solid var(--line);border-left:5px solid var(--warn);background:var(--surface);padding:10px 12px;border-radius:var(--r);font-size:14px;margin-block:10px}
+.banner.info{border-left-color:var(--brand)}
+.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;margin-block:12px}
+.stat{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:10px}
+.stat b{display:block;font-family:var(--f-display);font-size:28px;line-height:1;font-variant-numeric:tabular-nums}
+.stat span{font-size:12px;color:var(--muted)}
+.bar{height:8px;background:var(--sunk);border-radius:99px;overflow:hidden;margin-top:6px}
+.bar i{display:block;height:100%;background:var(--brand)}
+@media (max-width:460px){.stats{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center}
+.btn{border:1.5px solid var(--line);background:var(--surface);border-radius:var(--r);padding:10px 14px;min-height:44px;font-weight:700;display:inline-flex;align-items:center;gap:6px;justify-content:center}
+.btn.primary{background:var(--accent);border-color:var(--accent);color:var(--on-accent)}
+.btn.brand{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.btn.ghost{background:transparent}
+.btn.danger{color:var(--crit);border-color:var(--crit);background:transparent}
+.btn.sm{min-height:36px;padding:6px 10px;font-size:14px}
+.btn[disabled]{opacity:.5;cursor:not-allowed}
+.search{flex:1 1 220px;min-width:0}
+input[type=text],input[type=number],input[type=date],select,textarea{width:100%;min-height:44px;border:1.5px solid var(--line);background:var(--surface);border-radius:var(--r);padding:9px 11px}
+textarea{min-height:76px;resize:vertical}
+input:disabled,select:disabled,textarea:disabled{opacity:.65}
+.chips{display:flex;gap:6px;flex-wrap:wrap;margin-block:10px}
+.chip{border:1.5px solid var(--line);background:var(--surface);border-radius:999px;padding:6px 12px;font-size:14px;min-height:36px}
+.chip[aria-pressed=true]{background:var(--ink);color:var(--bg);border-color:var(--ink)}
+.list{display:flex;flex-direction:column;gap:8px}
+.card{display:grid;grid-template-columns:auto minmax(0,1fr) auto;gap:12px;align-items:center;text-align:left;width:100%;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px}
+.card:hover{border-color:var(--brand)}
+.cls{width:44px;height:44px;border-radius:9px;display:grid;place-items:center;font-family:var(--f-display);font-weight:700;font-size:24px;color:var(--on-cls);background:var(--muted)}
+.cls.A{background:var(--cA)} .cls.B{background:var(--cB)} .cls.C{background:var(--cC)} .cls.D{background:var(--cD)} .cls.E{background:var(--cE)}
+.cls.none{background:var(--sunk);color:var(--muted);border:1.5px dashed var(--line)}
+.card .t{min-width:0}
+.card .t b{display:block;overflow-wrap:anywhere}
+.card .meta{font-size:13px;color:var(--muted)}
+.pills{display:flex;gap:4px;flex-wrap:wrap;justify-content:flex-end;max-width:150px}
+.pill{font-size:12px;border-radius:99px;padding:2px 8px;border:1.5px solid var(--line);color:var(--muted);white-space:nowrap}
+.pill.ok{border-color:var(--ok);color:var(--ok)}
+.pill.part{border-color:var(--warn);color:var(--warn)}
+.pill.pend{border-color:var(--accent);color:var(--accent)}
+.empty{background:var(--surface);border:1.5px dashed var(--line);border-radius:var(--r);padding:20px}
+.empty ol{margin:10px 0 0;padding-left:20px}
+.empty li{margin-block:4px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;margin-block:12px}
+.tabs{position:sticky;top:calc(env(safe-area-inset-top,0px) + 52px);z-index:15;background:var(--bg);display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:4px;padding-block:8px;border-bottom:1px solid var(--line)}
+.tab{border:0;background:transparent;padding:8px 4px;border-radius:8px;font-weight:700;font-size:14px;color:var(--muted);display:flex;flex-direction:column;align-items:center;gap:2px}
+.tab small{font-weight:400;font-size:11px}
+.tab[aria-selected=true]{background:var(--surface);color:var(--ink);box-shadow:inset 0 -3px 0 var(--accent)}
+.ahead{display:flex;gap:12px;align-items:center;margin-block:12px}
+.ahead .t{min-width:0}
+.ahead h2{overflow-wrap:anywhere}
+.saved{font-size:13px;color:var(--muted)}
+.grid2{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:520px){.grid2{grid-template-columns:1fr}}
+.field{display:flex;flex-direction:column;gap:5px;min-width:0}
+.field label{font-size:14px;font-weight:700}
+.field .hint{font-size:12px;color:var(--muted)}
+.req::after{content:" *";color:var(--accent)}
+.fs{display:flex;flex-direction:column;gap:12px}
+.crit{padding-block:14px;border-bottom:1px solid var(--line)}
+.crit:last-child{border-bottom:0}
+.crit .head{display:flex;justify-content:space-between;gap:8px;align-items:baseline;margin-bottom:8px}
+.scale{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:6px}
+.scale button{min-height:48px;border:1.5px solid var(--line);background:var(--surface);border-radius:9px;font-family:var(--f-display);font-weight:700;font-size:22px}
+.scale button[aria-pressed=true]{background:var(--brand);border-color:var(--brand);color:var(--on-brand)}
+.scale.sm button{min-height:40px;font-size:18px}
+.rule{font-size:14px;color:var(--muted);margin-top:8px;min-height:2.8em}
+.rule b{color:var(--ink)}
+.risks{display:flex;flex-direction:column;gap:10px}
+.risk{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,220px);gap:10px;align-items:center}
+.risk .nm{font-size:14px}
+.risk .nm small{display:block;color:var(--muted);font-size:12px}
+@media (max-width:520px){.risk{grid-template-columns:1fr}}
+.preview{display:grid;grid-template-columns:auto minmax(0,1fr);gap:12px;align-items:center;background:var(--sunk);border-radius:var(--r);padding:12px;margin-block:12px}
+.preview .nums{font-size:14px}
+.preview .nums b{font-variant-numeric:tabular-nums}
+.kv{display:flex;gap:14px;flex-wrap:wrap;font-variant-numeric:tabular-nums}
+.pts{display:flex;flex-direction:column;gap:10px}
+.pt{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px;display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:12px}
+.pt h3{display:flex;gap:8px;align-items:center}
+.pt .ph{width:112px;height:112px;border-radius:8px;background:var(--sunk);display:grid;place-items:center;overflow:hidden;font-size:12px;color:var(--muted);text-align:center;border:1.5px dashed var(--line)}
+.pt .ph img{width:100%;height:100%;object-fit:cover}
+.pt .flds{display:flex;flex-direction:column;gap:8px;min-width:0}
+.pt .act{grid-column:1/-1;display:flex;gap:8px;flex-wrap:wrap}
+@media (max-width:420px){.pt{grid-template-columns:1fr}.pt .ph{width:100%;height:180px}}
+.formula{font-family:var(--f-mono);font-size:13px;background:var(--sunk);border-radius:8px;padding:8px 10px;overflow-x:auto}
+.toast{position:fixed;left:50%;transform:translateX(-50%);bottom:calc(16px + env(safe-area-inset-bottom,0px));z-index:50;background:var(--ink);color:var(--bg);padding:10px 14px;border-radius:10px;max-width:calc(100% - 32px);font-size:14px;box-shadow:0 6px 24px rgb(0 0 0 / .25)}
+.confirm{border:1.5px solid var(--crit);border-radius:var(--r);padding:12px;background:var(--surface);margin-top:10px}
+details summary{cursor:pointer;font-weight:700}
+.vh{position:absolute;width:1px;height:1px;overflow:hidden;clip:rect(0 0 0 0);white-space:nowrap}
+@media (prefers-reduced-motion:no-preference){.btn,.chip,.card,.scale button{transition:background-color .12s,border-color .12s}}
+</style>
+
+<header class="topbar"><div class="in" id="topbar"></div></header>
+<main class="wrap" id="app"></main>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+<input type="file" id="fileCam" accept="image/*" capture="environment" class="vh" aria-hidden="true" tabindex="-1">
+<input type="file" id="fileGal" accept="image/*" class="vh" aria-hidden="true" tabindex="-1">
+<input type="file" id="fileImp" accept=".xlsx,.xls,.csv" class="vh" aria-hidden="true" tabindex="-1">
+
+<script>
+(() => {
+"use strict";
+// ---------- Parâmetros (iguais à aba PARAMETROS da planilha) ----------
+const TIPOS = ["Prédio administrativo","Margem de via","Circulação de pessoas","Circulação de veículos","Entorno de estruturas/instalações","Muro","Cerca perimetral","Área de acesso","Drenagem","Talude","Paisagismo/conservação","Segurança patrimonial","Outras"];
+const VEG = {"Gramínea (gramado)":2,"Capim":5,"Vegetação rasteira":2,"Vegetação arbustiva":3,"Vegetação invasora":4,"Bambuzal":4,"Rebrotas":4,"Vegetação de alta densidade":5,"Vegetação mista":3,"Outros":3};
+const TERRENOS = ["Plano","Ondulado","Talude / declive acentuado","Com muitos obstáculos"];
+const METODOS = ["Roçadeira costal/lateral","Mecanizada (giro zero/trator)","Manual (foice/facão)","Mista (mecanizada + acabamento)"];
+const SITUACOES = ["Ativa","Em validação","Inativa","Inacessível"];
+const PERIODOS = ["Chuvoso","Transição","Seco"];
+const DIRS = ["N","NE","L","SE","S","SO","O","NO"];
+const CYC = {A:[15,15,20],B:[15,20,30],C:[20,30,45],D:[30,45,60],E:[60,60,90]};
+const W = {cresc:.25,crit:.20,risco:.15,veg:.15,hist:.10,clima:.10,cond:.05};
+const CRITS = [
+  {k:"cresc", nome:"Velocidade de crescimento", niveis:[
+    "Muito baixa: menos de 1 cm/semana; mais de 60 dias até ficar Ruim no período chuvoso.",
+    "Baixa: 1 a 3 cm/semana; 46 a 60 dias até Ruim.",
+    "Média: 3 a 6 cm/semana; 31 a 45 dias até Ruim.",
+    "Alta: 6 a 10 cm/semana; 21 a 30 dias até Ruim.",
+    "Muito alta: mais de 10 cm/semana; até 20 dias até Ruim (capim no pico das chuvas)."]},
+  {k:"crit", nome:"Criticidade operacional", niveis:[
+    "Área isolada: sem circulação, sem estrutura ou equipamento a menos de 10 m, sem drenagem nem função de segurança.",
+    "Circulação eventual (menos de 1 vez por semana); estruturas a mais de 10 m; impacto só estético.",
+    "Circulação diária de pessoas, estrutura a até 10 m ou paisagismo de prédio; afeta conforto e imagem.",
+    "Via ou acesso com tráfego diário, entorno de instalação, drenagem ativa ou cerca perimetral.",
+    "Risco direto: interseções e curvas, rota de emergência, faixa de CFTV/ronda, subestação, tanques, exigência legal."]},
+  {k:"clima", nome:"Sensibilidade climática", niveis:[
+    "Ritmo igual o ano todo (solo raso ou seco, sombreado).",
+    "Variação pequena (chuvoso cerca de 1,2× o seco).",
+    "Variação moderada (chuvoso cerca de 1,5× o seco).",
+    "Alta: baixada, solo úmido, margem de drenagem (chuvoso 2× ou mais).",
+    "Muito alta: área irrigada, encharcada ou que recebe escoamento (3× ou mais)."]},
+  {k:"cond", nome:"Condição atual", niveis:[
+    "Excelente: até 10 cm, uniforme, bordas acabadas, sem resíduos.",
+    "Boa: 10 a 20 cm; manchas isoladas em menos de 10% da área.",
+    "Regular: 20 a 30 cm ou 10 a 25% acima do padrão; começa a invadir meio-fio e cerca.",
+    "Ruim: 30 a 50 cm ou mais de 25% acima; vegetação em cercas e drenagens.",
+    "Crítica: mais de 50 cm; obstrução de visibilidade, sinalização ou drenagem; material seco; animais."]}
+];
+const RISKS = [
+  {k:"seg", nome:"Segurança de pessoas", a5:"oculta buracos, tocos ou animais em rota de pedestres"},
+  {k:"vis", nome:"Visibilidade", a5:"bloqueia visada em cruzamento, curva ou sinalização"},
+  {k:"circ", nome:"Circulação", a5:"invade faixa de rolamento ou passeio"},
+  {k:"dren", nome:"Drenagem", a5:"obstrui canaleta ou bueiro que protege instalação ou via"},
+  {k:"aces", nome:"Acesso", a5:"impede acesso de manutenção ou emergência"},
+  {k:"pat", nome:"Segurança patrimonial", a5:"ponto cego no CFTV ou esconde intrusos na cerca"},
+  {k:"estr", nome:"Proximidade de estruturas", a5:"encosta em subestação, tanque, painel ou tubovia"},
+  {k:"inc", nome:"Propagação de incêndio", a5:"biomassa seca contínua até uma instalação"},
+  {k:"oper", nome:"Interferência operacional", a5:"impede operação ou inspeção obrigatória"}
+];
+const RISK_SCALE = ["Inexistente","Baixo","Moderado","Alto","Muito alto"];
+
+// ---------- Utilitários ----------
+const $ = (s, r=document) => r.querySelector(s);
+const esc = s => String(s ?? "").replace(/[&<>"']/g, c => ({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+const clone = o => JSON.parse(JSON.stringify(o));
+const num = v => { if (v === null || v === undefined || v === "") return null; const n = parseFloat(String(v).replace(",", ".")); return isFinite(n) ? n : null; };
+const fmtN = (v, d=0) => v == null ? "–" : Number(v).toLocaleString("pt-BR", {maximumFractionDigits:d, minimumFractionDigits:d});
+const today = () => { const d = new Date(); return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0"); };
+const brDate = iso => iso ? iso.slice(8,10)+"/"+iso.slice(5,7)+"/"+iso.slice(0,4) : "";
+const getPath = (o, p) => p.split(".").reduce((a, k) => a == null ? undefined : a[k], o);
+function setPath(o, p, v){ const ks = p.split("."); let a = o; for (let i = 0; i < ks.length-1; i++){ if (a[ks[i]] == null || typeof a[ks[i]] !== "object") a[ks[i]] = {}; a = a[ks[i]]; } a[ks[ks.length-1]] = v; }
+const LS = {
+  get(k, d){ try { const v = localStorage.getItem(k); return v ? JSON.parse(v) : d; } catch { return d; } },
+  set(k, v){ try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
+};
+let toastT;
+function toast(msg, ms=3200){ const t = $("#toast"); t.textContent = msg; t.hidden = false; clearTimeout(toastT); toastT = setTimeout(() => t.hidden = true, ms); }
+function parseCoord(s){
+  if (!s) return null;
+  const m = String(s).replace(/[()]/g," ").match(/(-?\d+(?:[.,]\d+)?)\s*[,;\s]\s*(-?\d+(?:[.,]\d+)?)/);
+  if (!m) return null;
+  const lat = num(m[1]), lon = num(m[2]);
+  if (lat == null || lon == null || Math.abs(lat) > 90 || Math.abs(lon) > 180) return null;
+  return {lat, lon};
+}
+const coordStr = (lat, lon) => (lat != null && lon != null) ? `${lat.toFixed(6)}, ${lon.toFixed(6)}` : "";
+
+// ---------- Cálculos (mesmas regras da planilha) ----------
+function riskScore(d){
+  const v = RISKS.map(r => d?.riscos?.[r.k]).filter(x => x >= 1);
+  if (!v.length) return null;
+  return Math.round(0.5*Math.max(...v) + 0.5*v.reduce((a,b)=>a+b,0)/v.length);
+}
+function histScore(h){
+  h = h || {};
+  const occKeys = ["retrab","reinc","reclam","nc"];
+  const has = num(h.rocadas12) != null || occKeys.some(k => num(h[k]) != null) || num(h.diasRuim) != null;
+  if (!has) return {s:3, neutro:true};
+  const n = occKeys.reduce((a,k) => a + (num(h[k]) || 0), 0);
+  const so = n === 0 ? 1 : n === 1 ? 2 : n === 2 ? 3 : n <= 4 ? 4 : 5;
+  const dr = num(h.diasRuim);
+  const sd = dr == null ? 1 : dr <= 15 ? 5 : dr <= 25 ? 4 : dr <= 40 ? 3 : dr <= 60 ? 2 : 1;
+  return {s: Math.max(so, sd), neutro:false, ocorr:n};
+}
+function calc(r){
+  const d = r.diag || {};
+  const risco = riskScore(d);
+  const veg = VEG[r.vegetacao] ?? null;
+  const hs = histScore(r.hist);
+  const miss = [];
+  CRITS.forEach(c => { if (!(d[c.k] >= 1)) miss.push(c.nome.toLowerCase()); });
+  if (risco == null) miss.push("risco");
+  if (veg == null) miss.push("tipo de vegetação");
+  if (miss.length) return {ok:false, miss, risco, hs};
+  const pf = d.cresc*W.cresc + d.crit*W.crit + risco*W.risco + veg*W.veg + hs.s*W.hist + d.clima*W.clima + d.cond*W.cond;
+  const idx = Math.round((pf-1)/4*1000)/10;
+  let cls = idx >= 80 ? "A" : idx >= 60 ? "B" : idx >= 40 ? "C" : idx >= 20 ? "D" : "E";
+  let regra = "";
+  if ((d.crit === 5 || risco === 5) && cls > "B"){ cls = "B"; regra = "piso"; }
+  else if (d.crit <= 2 && risco <= 2 && cls < "D"){ cls = "D"; regra = "teto"; }
+  let cyc = CYC[cls].slice();
+  if (r.sazonalidade === "Não") cyc = [cyc[1], cyc[1], cyc[1]];
+  return {ok:true, pf, idx, cls, regra, risco, hs, veg, cyc};
+}
+function evid(r){
+  const A = num(r.area_m2) || 0, L = num(r.extensao_m) || 0, I = Math.min(3, num(r.interfaces) || 0);
+  let N;
+  if (r.geometria === "Linear"){ if (!L) return null; N = Math.max(2, Math.ceil(L/200)+1) + I; }
+  else { if (!A) return null; N = Math.max(2, Math.ceil(2*Math.sqrt(A/1500))) + I; }
+  N = Math.min(20, N);
+  const pano = r.geometria !== "Linear" && A >= 5000;
+  return {N, pano, fotos: 2*N + Math.ceil(N/3) + (pano ? 2 : 0)};
+}
+function cadMiss(r){
+  const m = [];
+  if (!r.nome) m.push("nome"); if (!r.setor) m.push("setor");
+  if (!(num(r.area_m2) > 0)) m.push("área (m²)");
+  if (!r.geometria) m.push("geometria");
+  if (r.geometria === "Linear" && !(num(r.extensao_m) > 0)) m.push("extensão");
+  if (!r.tipo_area) m.push("tipo de área"); if (!r.vegetacao) m.push("vegetação");
+  if (!r.terreno) m.push("terreno"); if (!r.metodo) m.push("método");
+  return m;
+}
+function diagState(r){
+  const d = r.diag || {};
+  const n = CRITS.filter(c => d[c.k] >= 1).length + RISKS.filter(x => d.riscos?.[x.k] >= 1).length;
+  return n === 13 ? "ok" : n ? "part" : "none";
+}
+function fotoState(r){
+  const e = evid(r);
+  const done = (r.pontos || []).filter(p => p.foto || p.fotoPend).length;
+  return {N: e?.N ?? null, done};
+}
+
+// ---------- Fotos no aparelho (IndexedDB) ----------
+let idbP = null;
+function idb(){
+  if (idbP) return idbP;
+  idbP = new Promise((res) => {
+    try {
+      const rq = indexedDB.open("vistoria-rocada", 1);
+      rq.onupgradeneeded = () => rq.result.createObjectStore("fotos");
+      rq.onsuccess = () => res(rq.result);
+      rq.onerror = () => res(null);
+    } catch { res(null); }
+  });
+  return idbP;
+}
+async function idbOp(mode, fn){
+  const d = await idb(); if (!d) return null;
+  return new Promise((res) => { try { const tx = d.transaction("fotos", mode); const st = tx.objectStore("fotos"); const rq = fn(st); tx.oncomplete = () => res(rq ? rq.result : true); tx.onerror = () => res(null); } catch { res(null); } });
+}
+const idbGet = k => idbOp("readonly", st => st.get(k));
+const idbPut = (k, v) => idbOp("readwrite", st => st.put(v, k));
+const idbDel = k => idbOp("readwrite", st => st.delete(k));
+const blobURLs = {};
+async function localPhotoURL(key){
+  if (blobURLs[key]) return blobURLs[key];
+  const b = await idbGet(key); if (!b) return null;
+  blobURLs[key] = URL.createObjectURL(b); return blobURLs[key];
+}
+
+// GPS gravado na foto (EXIF), quando o celular inclui
+function exifGps(buf){
+  try {
+    const v = new DataView(buf);
+    if (v.getUint16(0) !== 0xFFD8) return null;
+    let o = 2;
+    while (o < v.byteLength - 4){
+      const m = v.getUint16(o);
+      if (m === 0xFFE1){
+        const len = v.getUint16(o+2);
+        if (v.getUint32(o+4) === 0x45786966){
+          const t = o + 10, le = v.getUint16(t) === 0x4949;
+          const g16 = p => v.getUint16(p, le), g32 = p => v.getUint32(p, le);
+          const ifd0 = t + g32(t+4), n0 = g16(ifd0);
+          let gps = 0;
+          for (let i = 0; i < n0; i++){ const e = ifd0 + 2 + i*12; if (g16(e) === 0x8825) gps = g32(e+8); }
+          if (!gps) return null;
+          const gi = t + gps, gn = g16(gi);
+          const dms = off => { let s = 0; for (let k = 0; k < 3; k++){ const a = g32(t+off+k*8), b = g32(t+off+k*8+4); s += (b ? a/b : 0) / Math.pow(60, k); } return s; };
+          let lat = null, lon = null, latR = "N", lonR = "E";
+          for (let i = 0; i < gn; i++){
+            const e = gi + 2 + i*12, tag = g16(e);
+            if (tag === 1) latR = String.fromCharCode(v.getUint8(e+8));
+            if (tag === 3) lonR = String.fromCharCode(v.getUint8(e+8));
+            if (tag === 2) lat = dms(g32(e+8));
+            if (tag === 4) lon = dms(g32(e+8));
+          }
+          if (lat == null || lon == null || !isFinite(lat) || !isFinite(lon) || (lat === 0 && lon === 0)) return null;
+          return {lat: latR === "S" ? -lat : lat, lon: lonR === "W" ? -lon : lon};
+        }
+        o += 2 + len;
+      } else if ((m & 0xFF00) === 0xFF00){ o += 2 + v.getUint16(o+2); } else break;
+    }
+  } catch {}
+  return null;
+}
+async function prepPhoto(file, stamp){
+  let src, w0, h0;
+  try { src = await createImageBitmap(file, {imageOrientation:"from-image"}); w0 = src.width; h0 = src.height; }
+  catch {
+    src = await new Promise((res, rej) => { const im = new Image(); im.onload = () => res(im); im.onerror = rej; im.src = URL.createObjectURL(file); });
+    w0 = src.naturalWidth; h0 = src.naturalHeight;
+  }
+  const s = Math.min(1, 1600/Math.max(w0, h0));
+  const w = Math.round(w0*s), h = Math.round(h0*s);
+  const c = document.createElement("canvas"); c.width = w; c.height = h;
+  const x = c.getContext("2d");
+  x.drawImage(src, 0, 0, w, h);
+  const fs = Math.max(14, Math.round(w/48));
+  x.fillStyle = "rgba(0,0,0,0.62)"; x.fillRect(0, h - fs*2.3, w, fs*2.3);
+  x.fillStyle = "#ffffff"; x.font = `700 ${fs}px Arial, sans-serif`; x.textBaseline = "middle";
+  x.fillText(stamp, fs*0.6, h - fs*1.15, w - fs*1.2);
+  return await new Promise(res => c.toBlob(res, "image/jpeg", 0.76));
+}
+
+// ---------- Estado ----------
+let db = null, assets = null, downloads = null, user = null, myId = null;
+const STANDALONE = !(window.claude && typeof window.claude.use === "function");
+let dbState = STANDALONE ? "local" : "connecting"; // connecting | ok | none | local
+let deleted = new Set(LS.get("rocada.deleted", []));
+const saveDeleted = () => LS.set("rocada.deleted", Array.from(deleted));
+let readOnly = false, flushing = false, lastErr = "";
+let areas = {};                    // do banco compartilhado
+let pending = LS.get("rocada.pending", {});   // salvo no aparelho, aguardando envio
+let ver = LS.get("rocada.ver", 0);
+const ui = LS.get("rocada.ui", {view:"lista", id:null, tab:"cad", filtro:"todas", setor:"", q:""});
+let draft = null, saveT = null, confirmDel = false, remoteNewer = false, newForm = false, busy = "";
+const saveUI = () => LS.set("rocada.ui", {view:ui.view, id:ui.id, tab:ui.tab, filtro:ui.filtro, setor:ui.setor, q:ui.q});
+const savePending = () => { LS.set("rocada.pending", pending); LS.set("rocada.ver", ver); };
+const getRec = id => pending[id] || areas[id] || null;
+const allIds = () => Array.from(new Set([...Object.keys(areas), ...Object.keys(pending)])).filter(i => !deleted.has(i)).sort((a,b) => a.localeCompare(b, "pt-BR", {numeric:true}));
+const blankRec = (id, nome) => ({id, sap:"", nome:nome||"", descricao:"", localizacao:"", setor:"", lat:null, lon:null, area_m2:null, geometria:"Poligonal", extensao_m:null, tipo_area:"", vegetacao:"", terreno:"", metodo:"", interfaces:0, periodicidade_atual:null, sazonalidade:"Sim", situacao:"Ativa", obs:"", diag:{data:today(), avaliador:LS.get("rocada.avaliador",""), riscos:{}, obs:""}, hist:{}, pontos:[], meta:{criado:new Date().toISOString(), atualizado:new Date().toISOString(), por:myId}});
+
+// ---------- Envio ----------
+function queue(rec){
+  ver += 1;
+  const r = clone(rec); r._v = ver;
+  pending[r.id] = r; savePending(); renderSync();
+  flush();
+}
+function applyFoto(id, n, assetId){
+  [pending[id], draft && draft.id === id ? draft : null].forEach(r => {
+    const p = r?.pontos?.find(x => x.n === n);
+    if (p){ p.foto = assetId; p.fotoPend = false; }
+  });
+  savePending();
+}
+async function flush(){
+  if (flushing || !db || readOnly) return;
+  flushing = true; lastErr = ""; renderSync();
+  try {
+    for (const id of Object.keys(pending)){
+      const first = pending[id];
+      if (assets){
+        for (const p of (first.pontos || [])){
+          if (!p.fotoPend) continue;
+          const key = id + "|" + p.n;
+          const blob = await idbGet(key);
+          if (!blob) continue;
+          try {
+            const up = await assets.upload(blob, {type:"image/jpeg"});
+            applyFoto(id, p.n, up.id);
+            await idbDel(key);
+          } catch (e) {
+            if (e?.code === "quota_or_state") lastErr = "Espaço de fotos esgotado";
+          }
+        }
+      }
+      const rec = pending[id]; if (!rec) continue;
+      const v = rec._v, body = clone(rec); delete body._v;
+      try {
+        await db.doc("areas/" + id).set(body);
+        if (pending[id] && pending[id]._v === v) delete pending[id];
+        savePending();
+      } catch (e) {
+        if (e?.code === "invalid_argument"){ readOnly = true; lastErr = "Seu acesso não permite enviar"; break; }
+        if (e?.code === "quota_exceeded"){ lastErr = "Banco cheio"; break; }
+        lastErr = "Sem conexão"; break;
+      }
+    }
+  } finally {
+    flushing = false; renderSync();
+    if (ui.view === "lista") renderList();
+    if (ui.view === "area" && ui.tab === "evid") refreshPhotos();
+  }
+}
+window.addEventListener("online", () => flush());
+setInterval(() => { if (Object.keys(pending).length && !flushing) flush(); }, 45000);
+
+// ---------- Barra superior ----------
+function renderTop(){
+  const tb = $("#topbar");
+  if (ui.view === "area"){
+    tb.innerHTML = `<button class="back" data-act="home" aria-label="Voltar para a lista">‹ Áreas</button><div class="brand">${esc(ui.id)}</div><button class="sync" id="sync" data-act="flush"></button>`;
+  } else {
+    tb.innerHTML = `<div class="brand">Vistoria de Roçada <small>diagnóstico de campo</small></div><button class="sync" id="sync" data-act="flush"></button>`;
+  }
+  renderSync();
+}
+function renderSync(){
+  const el = $("#sync"); if (!el) return;
+  const n = Object.keys(pending).length;
+  el.className = "sync";
+  let txt;
+  if (dbState === "connecting") txt = "Conectando…";
+  else if (dbState === "local"){ txt = n ? `Modo local · ${n} editada${n > 1 ? "s" : ""}` : "Modo local"; }
+  else if (dbState === "none"){ el.classList.add("off"); txt = n ? `${n} só no aparelho` : "Só neste aparelho"; }
+  else if (flushing) { el.classList.add("pend"); txt = "Enviando…"; }
+  else if (n){ el.classList.add(lastErr ? "off" : "pend"); txt = `${n} a enviar${lastErr ? " · " + lastErr : ""}`; }
+  else txt = "Tudo enviado";
+  el.innerHTML = `<span class="dot" aria-hidden="true"></span><span>${esc(txt)}</span>`;
+  el.title = dbState === "local" ? "Os dados ficam neste aparelho. Exporte a planilha para consolidar." : (n ? "Toque para enviar agora" : "");
+}
+
+// ---------- Lista ----------
+function renderList(){
+  const app = $("#app");
+  const ids = allIds();
+  const recs = ids.map(getRec);
+  const setores = Array.from(new Set(recs.map(r => r.setor).filter(Boolean))).sort();
+  const q = (ui.q || "").toLowerCase();
+  const rows = recs.filter(r => {
+    if (ui.setor && r.setor !== ui.setor) return false;
+    if (q && !(`${r.id} ${r.nome} ${r.localizacao} ${r.sap || ""}`.toLowerCase().includes(q))) return false;
+    const c = cadMiss(r).length === 0, d = diagState(r) === "ok", f = fotoState(r);
+    const fok = f.N != null && f.done >= f.N;
+    if (ui.filtro === "cad") return !c;
+    if (ui.filtro === "diag") return !d;
+    if (ui.filtro === "fotos") return !fok;
+    if (ui.filtro === "ok") return c && d && fok;
+    return true;
+  });
+  const tot = recs.length;
+  const nc = recs.filter(r => !cadMiss(r).length).length;
+  const nd = recs.filter(r => diagState(r) === "ok").length;
+  const nf = recs.filter(r => { const f = fotoState(r); return f.N != null && f.done >= f.N; }).length;
+  const m2 = recs.reduce((a, r) => a + (num(r.area_m2) || 0), 0);
+  const pct = x => tot ? Math.round(x/tot*100) : 0;
+  let h = "";
+  if (readOnly) h += `<div class="banner">Seu acesso a este app é só de leitura. O que você preencher fica neste aparelho. Peça acesso de colaborador ao responsável para enviar.</div>`;
+  if (dbState === "none") h += `<div class="banner">O banco compartilhado não está disponível nesta tela. Os dados ficam salvos só neste aparelho até ele voltar.</div>`;
+  if (dbState === "local") h += `<div class="banner info">Modo local: o que você preencher fica salvo neste aparelho e funciona sem sinal. Para juntar o trabalho da equipe, cada pessoa usa <b>Exportar planilha</b> e <b>Exportar fotos</b> ao fim do dia.</div>`;
+  h += `<section aria-label="Progresso"><div class="stats">
+    <div class="stat"><b>${tot}</b><span>áreas · ${fmtN(m2)} m²</span></div>
+    <div class="stat"><b>${nc}</b><span>cadastro completo</span><div class="bar"><i style="width:${pct(nc)}%"></i></div></div>
+    <div class="stat"><b>${nd}</b><span>diagnóstico completo</span><div class="bar"><i style="width:${pct(nd)}%"></i></div></div>
+    <div class="stat"><b>${nf}</b><span>evidências completas</span><div class="bar"><i style="width:${pct(nf)}%"></i></div></div>
+  </div></section>`;
+  h += `<div class="row">
+    <button class="btn primary" data-act="new">+ Nova área</button>
+    <button class="btn" data-act="import">Importar cadastro</button>
+    <button class="btn" data-act="xlsx" ${busy ? "disabled" : ""}>${busy === "xlsx" ? "Gerando…" : "Exportar planilha"}</button>
+    <button class="btn" data-act="zip" ${busy ? "disabled" : ""}>${busy === "zip" ? "Gerando…" : "Exportar fotos"}</button>
+  </div>`;
+  if (newForm){
+    h += `<form class="panel fs" id="newf"><h3>Nova área</h3>
+      <div class="grid2">
+        <div class="field"><label class="req" for="n-id">ID da área</label><input type="text" id="n-id" autocomplete="off" autocapitalize="characters" placeholder="ex.: OFC-086" required><span class="hint">Letras, números, hífen e ponto. Igual ao da planilha.</span></div>
+        <div class="field"><label for="n-nome">Nome da área</label><input type="text" id="n-nome" autocomplete="off" placeholder="ex.: Entorno da portaria 2"></div>
+      </div>
+      <div class="row"><button class="btn primary" type="submit">Criar e abrir</button><button class="btn ghost" type="button" data-act="cancelnew">Cancelar</button></div></form>`;
+  }
+  if (!tot){
+    h += `<div class="empty" style="margin-top:14px"><h3>Nenhuma área ainda</h3>
+      <p>Comece de um destes jeitos:</p>
+      <ol><li><b>Importar cadastro</b>: escolha a planilha de diagnóstico (aba BASE_AREAS) ou o seu cadastro atual em Excel ou CSV. As áreas chegam prontas para a vistoria.</li>
+      <li><b>Nova área</b>: cadastre direto no campo.</li></ol>
+      <p style="margin-bottom:0">Em cada área você preenche quatro abas: cadastro, diagnóstico (notas de 1 a 5), histórico e evidências (pontos fixos com foto). A prévia da classe aparece enquanto você preenche.</p></div>`;
+  } else {
+    h += `<div class="row" style="margin-top:14px"><input class="search" type="text" id="q" placeholder="Buscar por ID, nome, local ou código SAP" value="${esc(ui.q)}" aria-label="Buscar área">
+      <select id="fsetor" aria-label="Filtrar por setor" style="width:auto;min-width:130px"><option value="">Todos os setores</option>${setores.map(s => `<option ${s === ui.setor ? "selected" : ""}>${esc(s)}</option>`).join("")}</select></div>
+      <div class="chips" role="group" aria-label="Filtrar por situação">${[["todas","Todas"],["cad","Falta cadastro"],["diag","Falta diagnóstico"],["fotos","Faltam fotos"],["ok","Completas"]].map(([k,l]) => `<button class="chip" data-act="filtro" data-v="${k}" aria-pressed="${ui.filtro === k}">${l}</button>`).join("")}</div>
+      <div class="list">${rows.map(cardHTML).join("") || `<div class="empty">Nenhuma área com esse filtro.</div>`}</div>`;
+  }
+  h += `<details class="panel"><summary>Como as notas viram classe</summary>
+    <p>A prévia usa os mesmos pesos e regras da planilha: crescimento 25%, criticidade 20%, risco 15%, vegetação 15%, histórico 10%, clima 10%, condição 5%. Índice ≥ 80 = A, 60 a 79 = B, 40 a 59 = C, 20 a 39 = D, abaixo de 20 = E. Criticidade ou risco 5 leva no mínimo a B; criticidade e risco até 2 limitam a D.</p>
+    <p style="margin-bottom:0">A classe oficial continua sendo a da planilha, depois da validação.</p></details>`;
+  app.innerHTML = h;
+  if (newForm) $("#n-id")?.focus();
+}
+function cardHTML(r){
+  const c = calc(r), cm = cadMiss(r), ds = diagState(r), f = fotoState(r);
+  const fok = f.N != null && f.done >= f.N;
+  const cls = c.ok ? `<div class="cls ${c.cls}" aria-label="Classe ${c.cls}">${c.cls}</div>` : `<div class="cls none" aria-label="Sem classe">?</div>`;
+  const pills = [
+    `<span class="pill ${cm.length ? (cm.length < 9 ? "part" : "") : "ok"}">Cadastro</span>`,
+    `<span class="pill ${ds === "ok" ? "ok" : ds === "part" ? "part" : ""}">Diagnóstico</span>`,
+    `<span class="pill ${fok ? "ok" : f.done ? "part" : ""}">Fotos ${f.done}/${f.N ?? "?"}</span>`,
+    pending[r.id] ? (dbState === "local" ? `<span class="pill pend">editada</span>` : `<span class="pill pend">a enviar</span>`) : ""
+  ].join("");
+  return `<button class="card" data-act="open" data-id="${esc(r.id)}">${cls}<div class="t"><b>${esc(r.id)} · ${esc(r.nome || "sem nome")}</b><div class="meta">${esc([r.setor, r.tipo_area, num(r.area_m2) ? fmtN(r.area_m2) + " m²" : (r.geometria === "Linear" && num(r.extensao_m) ? fmtN(r.extensao_m) + " m lineares" : "")].filter(Boolean).join(" · ") || "cadastro a preencher")}</div>${r.sap ? `<div class="meta mono">${esc(r.sap)}</div>` : ""}</div><div class="pills">${pills}</div></button>`;
+}
+
+// ---------- Editor ----------
+function openArea(id){
+  ui.view = "area"; ui.id = id; if (!ui.tab) ui.tab = "cad";
+  const r = getRec(id); draft = r ? clone(r) : null; delete draft?._v;
+  confirmDel = false; remoteNewer = false;
+  saveUI(); renderTop(); renderArea(); window.scrollTo(0, 0);
+}
+function goHome(){
+  commitNow();
+  ui.view = "lista"; ui.id = null; draft = null; saveUI(); renderTop(); renderList(); window.scrollTo(0, 0);
+}
+function commitNow(){ if (saveT){ clearTimeout(saveT); saveT = null; if (draft) queue(draft); } }
+function touch(){
+  if (!draft) return;
+  draft.meta = draft.meta || {};
+  draft.meta.atualizado = new Date().toISOString(); draft.meta.por = myId;
+  const s = $("#savedmsg"); if (s) s.textContent = "Salvando…";
+  clearTimeout(saveT);
+  saveT = setTimeout(() => { saveT = null; queue(draft); const s2 = $("#savedmsg"); if (s2) s2.textContent = "Salvo no aparelho"; updateHead(); }, 900);
+}
+function selectHTML(id, path, opts, val, req){
+  const list = opts.slice(); if (val && !list.includes(val)) list.push(val);
+  return `<select id="${id}" data-f="${path}" ${req ? "required" : ""}><option value="">Selecione…</option>${list.map(o => `<option ${o === val ? "selected" : ""}>${esc(o)}</option>`).join("")}</select>`;
+}
+const inp = (id, path, val, type="text", extra="") => `<input type="${type}" id="${id}" data-f="${path}" value="${esc(val ?? "")}" ${extra}>`;
+function headHTML(){
+  const r = draft, c = calc(r), cm = cadMiss(r), f = fotoState(r);
+  const cls = c.ok ? `<div class="cls ${c.cls}">${c.cls}</div>` : `<div class="cls none">?</div>`;
+  return `${cls}<div class="t"><h2>${esc(r.nome || "Área sem nome")}</h2><div class="saved"><span id="savedmsg">${pending[r.id] ? "Salvo no aparelho" : (dbState === "local" ? "Sem alterações" : "Enviado")}</span>${r.meta?.atualizado ? " · atualizado " + esc(new Date(r.meta.atualizado).toLocaleString("pt-BR", {dateStyle:"short", timeStyle:"short"})) : ""}<span id="byname"></span></div></div>`;
+}
+function updateHead(){
+  const h = $("#ahead"); if (h) h.innerHTML = headHTML();
+  resolveBy();
+  const pv = $("#preview"); if (pv) pv.innerHTML = previewHTML();
+  const tabs = $("#tabs"); if (tabs) tabs.innerHTML = tabsHTML();
+}
+async function resolveBy(){
+  const id = draft?.meta?.por; const el = $("#byname");
+  if (!el || !id || !user) return;
+  try { const ps = await user.profiles([id]); const nm = ps[id]?.name; if (nm && $("#byname")) $("#byname").textContent = " por " + nm; } catch {}
+}
+function tabsHTML(){
+  const r = draft, cm = cadMiss(r), ds = diagState(r), f = fotoState(r);
+  const t = [
+    ["cad","Cadastro", cm.length ? `faltam ${cm.length}` : "completo"],
+    ["diag","Diagnóstico", ds === "ok" ? "completo" : ds === "part" ? "em andamento" : "a fazer"],
+    ["hist","Histórico", histScore(r.hist).neutro ? "opcional" : "informado"],
+    ["evid","Evidências", `${f.done}/${f.N ?? "?"} pontos`]
+  ];
+  return t.map(([k,l,s]) => `<button class="tab" role="tab" data-act="tab" data-v="${k}" aria-selected="${ui.tab === k}">${l}<small>${s}</small></button>`).join("");
+}
+function previewHTML(){
+  const c = calc(draft), e = evid(draft);
+  if (!c.ok) return `<div class="cls none">?</div><div class="nums">Prévia da classe: falta ${esc(c.miss.join(", "))}.${c.risco != null ? ` Risco calculado: <b>${c.risco}</b>.` : ""}</div>`;
+  const regra = c.regra === "piso" ? " · elevada a B pela regra de piso" : c.regra === "teto" ? " · limitada a D pela regra de teto" : "";
+  return `<div class="cls ${c.cls}">${c.cls}</div><div class="nums"><div class="kv"><span>Índice <b>${fmtN(c.idx,1)}</b></span><span>Risco <b>${c.risco}</b></span><span>Histórico <b>${c.hs.s}</b>${c.hs.neutro ? " (neutro)" : ""}</span></div>
+    <div>Ciclos chuvoso / base / seco: <b>${c.cyc.join(" / ")} dias</b>${esc(regra)}</div>${e ? `<div>Evidência: <b>${e.N} pontos</b>, ${e.fotos} fotos por OM${e.pano ? ", com panorâmica" : ""}</div>` : ""}</div>`;
+}
+function renderArea(){
+  const app = $("#app");
+  if (!draft){ app.innerHTML = `<div class="empty">Esta área não existe mais. <button class="btn sm" data-act="home">Voltar à lista</button></div>`; return; }
+  let h = "";
+  if (readOnly) h += `<div class="banner">Acesso só de leitura: o que você preencher fica neste aparelho.</div>`;
+  if (remoteNewer) h += `<div class="banner info">Outra pessoa atualizou esta área. <button class="btn sm" data-act="reload">Ver a versão mais recente</button></div>`;
+  h += `<div class="ahead" id="ahead">${headHTML()}</div>`;
+  h += `<nav class="tabs" id="tabs" role="tablist" aria-label="Etapas da vistoria">${tabsHTML()}</nav>`;
+  h += `<div id="tabbody">${tabBody()}</div>`;
+  app.innerHTML = h;
+  resolveBy();
+  if (ui.tab === "evid") refreshPhotos();
+}
+function tabBody(){
+  const r = draft;
+  if (ui.tab === "cad"){
+    const cm = cadMiss(r);
+    return `<div class="panel fs">
+      ${cm.length ? `<div class="banner">Para fechar o cadastro falta: ${esc(cm.join(", "))}.</div>` : ""}
+      <div class="grid2">
+        <div class="field"><label>ID da área</label><input type="text" value="${esc(r.id)}" disabled><span class="hint">Para trocar o ID, crie outra área.</span></div>
+        ${fld("Código SAP / local de instalação","f-sap","sap", inp("f-sap","sap",r.sap,"text",'placeholder="se já existir"'))}
+        ${fld("Nome da área","f-nome","nome", inp("f-nome","nome",r.nome), true)}
+        ${fld("Setor / região","f-setor","setor", inp("f-setor","setor",r.setor,"text",'list="setores" placeholder="ex.: Porto, Oficina, Pelotização"'), true)}
+        ${fld("Localização (referência)","f-loc","localizacao", inp("f-loc","localizacao",r.localizacao,"text",'placeholder="ex.: atrás da portaria 2"'))}
+        ${fld("Situação atual","f-sit","situacao", selectHTML("f-sit","situacao",SITUACOES,r.situacao))}
+      </div>
+      ${fld("Descrição","f-desc","descricao", `<textarea id="f-desc" data-f="descricao">${esc(r.descricao)}</textarea>`)}
+      <div class="field"><label for="f-coord">Coordenada do centro da área</label>
+        <div class="row"><input type="text" id="f-coord" data-coord="area" value="${esc(coordStr(r.lat, r.lon))}" placeholder="-2.530700, -44.306800" style="flex:1 1 200px;min-width:0" inputmode="decimal"><button class="btn sm" data-act="gps" data-target="area" type="button">Usar GPS</button>${r.lat != null ? `<a class="btn sm ghost" href="https://www.google.com/maps?q=${r.lat},${r.lon}" target="_blank" rel="noopener">Ver no mapa</a>` : ""}</div>
+        <span class="hint">Latitude, longitude em graus decimais. Pode colar do Google Maps ou do Google Earth.</span></div>
+      <div class="grid2">
+        ${fld("Geometria","f-geo","geometria", selectHTML("f-geo","geometria",["Poligonal","Linear"],r.geometria), true)}
+        ${fld("Área total (m²)","f-m2","area_m2", inp("f-m2","area_m2",r.area_m2,"text",'inputmode="decimal"'), true)}
+        ${r.geometria === "Linear" ? fld("Extensão (m)","f-ext","extensao_m", inp("f-ext","extensao_m",r.extensao_m,"text",'inputmode="decimal"'), true) : ""}
+        ${fld("Tipo de área","f-tipo","tipo_area", selectHTML("f-tipo","tipo_area",TIPOS,r.tipo_area), true)}
+        ${fld("Tipo de vegetação","f-veg","vegetacao", selectHTML("f-veg","vegetacao",Object.keys(VEG),r.vegetacao), true)}
+        ${fld("Terreno / acesso","f-ter","terreno", selectHTML("f-ter","terreno",TERRENOS,r.terreno), true)}
+        ${fld("Método predominante","f-met","metodo", selectHTML("f-met","metodo",METODOS,r.metodo), true)}
+        ${fld("Interfaces críticas (qtd)","f-int","interfaces", inp("f-int","interfaces",r.interfaces,"number",'min="0" max="20" inputmode="numeric"'), false, "Cercas, drenagens, árvores preservadas, estruturas, sinalização.")}
+        ${fld("Periodicidade atual (dias)","f-per","periodicidade_atual", inp("f-per","periodicidade_atual",r.periodicidade_atual,"number",'min="1" max="365" inputmode="numeric"'), false, "A praticada hoje, para o cenário atual.")}
+        ${fld("Aplicar sazonalidade?","f-saz","sazonalidade", selectHTML("f-saz","sazonalidade",["Sim","Não"],r.sazonalidade), false, "Não = irrigada, sombreada ou sem variação.")}
+      </div>
+      ${fld("Observações","f-obs","obs", `<textarea id="f-obs" data-f="obs">${esc(r.obs)}</textarea>`)}
+      <datalist id="setores">${Array.from(new Set(allIds().map(i => getRec(i)?.setor).filter(Boolean))).map(s => `<option value="${esc(s)}">`).join("")}</datalist>
+    </div>${dangerHTML()}`;
+  }
+  if (ui.tab === "diag"){
+    const d = r.diag || {};
+    return `<div class="preview" id="preview">${previewHTML()}</div>
+    <div class="panel"><div class="grid2">
+      ${fld("Data do diagnóstico","d-data","diag.data", inp("d-data","diag.data",d.data,"date"))}
+      ${fld("Avaliador","d-aval","diag.avaliador", inp("d-aval","diag.avaliador",d.avaliador,"text",'autocomplete="name"'))}
+    </div></div>
+    <div class="panel">${CRITS.map(c => critHTML(c, d[c.k])).join("")}</div>
+    <div class="panel"><div class="crit head" style="border:0;padding:0 0 4px"><h3>Risco</h3><span class="label-up">nota = metade do maior + metade da média</span></div>
+      <p class="hint" style="font-size:13px;color:var(--muted);margin:0 0 10px">1 ${RISK_SCALE[0]} · 2 ${RISK_SCALE[1]} · 3 ${RISK_SCALE[2]} · 4 ${RISK_SCALE[3]} · 5 ${RISK_SCALE[4]}. O texto embaixo de cada item descreve o nível 5.</p>
+      <div class="risks">${RISKS.map(x => `<div class="risk"><div class="nm">${esc(x.nome)}<small>5 = ${esc(x.a5)}</small></div>${scaleHTML("diag.riscos."+x.k, d.riscos?.[x.k], true, x.nome)}</div>`).join("")}</div></div>
+    <div class="panel">${fld("Observações do diagnóstico","d-obs","diag.obs", `<textarea id="d-obs" data-f="diag.obs">${esc(d.obs)}</textarea>`, false, "Na dúvida entre dois níveis, use o maior e explique aqui.")}</div>`;
+  }
+  if (ui.tab === "hist"){
+    const h = r.hist || {}, hs = histScore(h);
+    return `<div class="banner info">Preencha o que existir dos últimos 12 meses. Sem histórico, a nota fica neutra (3); só a data da última roçada não muda a nota. O campo mais útil é quantos dias a área leva para ficar Ruim depois de roçada.</div>
+    <div class="panel"><div class="grid2">
+      ${fld("Data da última roçada","h-ult","hist.ultima", inp("h-ult","hist.ultima",h.ultima,"date"))}
+      ${fld("Roçadas nos últimos 12 meses","h-n","hist.rocadas12", inp("h-n","hist.rocadas12",h.rocadas12,"number",'min="0" inputmode="numeric"'))}
+      ${fld("Retrabalhos (12 meses)","h-ret","hist.retrab", inp("h-ret","hist.retrab",h.retrab,"number",'min="0" inputmode="numeric"'))}
+      ${fld("Reincidências (12 meses)","h-rei","hist.reinc", inp("h-rei","hist.reinc",h.reinc,"number",'min="0" inputmode="numeric"'))}
+      ${fld("Reclamações (12 meses)","h-rec","hist.reclam", inp("h-rec","hist.reclam",h.reclam,"number",'min="0" inputmode="numeric"'))}
+      ${fld("Não conformidades (12 meses)","h-nc","hist.nc", inp("h-nc","hist.nc",h.nc,"number",'min="0" inputmode="numeric"'))}
+      ${fld("Dias após a roçada até ficar Ruim (condição 4)","h-dr","hist.diasRuim", inp("h-dr","hist.diasRuim",h.diasRuim,"number",'min="0" max="366" inputmode="numeric"'))}
+      ${fld("Período em que isso foi observado","h-per","hist.periodo", selectHTML("h-per","hist.periodo",PERIODOS,h.periodo))}
+    </div>
+    ${fld("Observações","h-obs","hist.obs", `<textarea id="h-obs" data-f="hist.obs">${esc(h.obs)}</textarea>`)}
+    <p id="histscore" style="margin-bottom:0">Nota histórica: <b>${hs.s}</b>${hs.neutro ? " (neutra, sem dados)" : ""}</p></div>`;
+  }
+  // evidências
+  const e = evid(r);
+  const pts = r.pontos || [];
+  const N = Math.max(e?.N || 0, pts.length);
+  let h = `<div class="panel">
+    ${e ? `<p style="margin-top:0">Esta área pede <b>${e.N} pontos fixos de evidência</b>${e.pano ? " e uma panorâmica" : ""}. Cadastre cada ponto uma vez, com coordenada, direção da foto e uma referência fixa visível (poste, placa, mourão). Nas OMs, as fotos de antes e depois saem desses mesmos pontos.</p>
+      <div class="formula">${r.geometria === "Linear" ? `N = máx(2; ⌈${fmtN(r.extensao_m)} ÷ 200⌉ + 1) + interfaces (${Math.min(3, num(r.interfaces) || 0)}) = ${e.N}` : `N = máx(2; ⌈2 × √(${fmtN(r.area_m2)} ÷ 1500)⌉) + interfaces (${Math.min(3, num(r.interfaces) || 0)}) = ${e.N}`}</div>`
+      : `<p style="margin:0">Informe a geometria e a área (ou a extensão, se for linear) no cadastro para saber quantos pontos registrar.</p>`}
+  </div>`;
+  if (N){
+    h += `<div class="pts">`;
+    for (let i = 1; i <= N; i++){
+      const p = pts.find(x => x.n === i) || {n:i};
+      const nn = String(i).padStart(2,"0");
+      const extra = e && i > e.N;
+      const has = p.foto || p.fotoPend;
+      h += `<div class="pt" data-n="${i}">
+        <div class="flds"><h3>P${nn} ${has ? `<span class="pill ok">foto</span>` : ""}${p.fotoPend ? `<span class="pill pend">foto no aparelho</span>` : ""}${extra ? `<span class="pill">extra</span>` : ""}</h3>
+          <div class="field"><label for="p${i}-c">Coordenada</label><div class="row"><input type="text" id="p${i}-c" data-coord="${i}" value="${esc(coordStr(p.lat, p.lon))}" placeholder="lat, lon" inputmode="decimal" style="flex:1 1 160px;min-width:0"><button class="btn sm" type="button" data-act="gps" data-target="${i}">GPS</button></div></div>
+          <div class="grid2"><div class="field"><label for="p${i}-d">Direção da foto</label><select id="p${i}-d" data-pf="dir" data-n="${i}"><option value="">–</option>${DIRS.map(d => `<option ${p.dir === d ? "selected" : ""}>${d}</option>`).join("")}</select></div>
+          <div class="field"><label for="p${i}-r">Referência fixa</label><input type="text" id="p${i}-r" data-pf="ref" data-n="${i}" value="${esc(p.ref || "")}" placeholder="ex.: poste 12"></div></div>
+        </div>
+        <div class="ph" id="ph-${i}">${has ? "carregando…" : "sem foto"}</div>
+        <div class="act"><button class="btn sm brand" type="button" data-act="cam" data-n="${i}">${has ? "Refazer foto" : "Tirar foto"}</button><button class="btn sm" type="button" data-act="gal" data-n="${i}">Da galeria</button></div>
+      </div>`;
+    }
+    h += `</div><div class="row" style="margin-top:10px"><button class="btn" data-act="addpt">+ Ponto extra</button></div>`;
+  }
+  h += `<p class="saved" style="margin-top:14px">A foto sai com carimbo de ID, ponto, data, hora e coordenada. Se o celular gravar o GPS na foto, a coordenada do ponto é preenchida sozinha.</p>`;
+  return h;
+}
+function fld(label, id, path, control, req=false, hint=""){
+  return `<div class="field"><label for="${id}" class="${req ? "req" : ""}">${esc(label)}</label>${control}${hint ? `<span class="hint">${esc(hint)}</span>` : ""}</div>`;
+}
+function scaleHTML(path, val, sm, label){
+  return `<div class="scale ${sm ? "sm" : ""}" role="group" aria-label="${esc(label)}">${[1,2,3,4,5].map(v => `<button type="button" data-act="score" data-f="${path}" data-v="${v}" aria-pressed="${val === v}">${v}</button>`).join("")}</div>`;
+}
+function critHTML(c, val){
+  return `<div class="crit" data-crit="${c.k}"><div class="head"><h3>${esc(c.nome)}</h3><span class="label-up">peso ${Math.round(W[c.k]*100)}%</span></div>
+    ${scaleHTML("diag."+c.k, val, false, c.nome)}
+    <div class="rule" id="rule-${c.k}">${val ? `<b>${val}</b> · ${esc(c.niveis[val-1])}` : "Toque na nota para ver a régua."}</div></div>`;
+}
+function dangerHTML(){
+  return `<div class="panel"><h3>Excluir área</h3><p class="saved">Remove a área, o diagnóstico e as fotos para todos que usam o app.</p>
+    ${confirmDel ? `<div class="confirm">Excluir <b>${esc(draft.id)}</b> e as fotos dela? Não dá para desfazer.<div class="row" style="margin-top:8px"><button class="btn danger" data-act="delyes">Excluir</button><button class="btn ghost" data-act="delno">Cancelar</button></div></div>`
+    : `<button class="btn danger" data-act="del">Excluir esta área</button>`}</div>`;
+}
+async function refreshPhotos(){
+  if (!draft) return;
+  for (const p of (draft.pontos || [])){
+    const el = $("#ph-" + p.n); if (!el) continue;
+    let src = null;
+    if (p.fotoPend) src = await localPhotoURL(draft.id + "|" + p.n);
+    if (!src && p.foto) src = "/_blob/" + p.foto;
+    if (src){ el.innerHTML = ""; const im = new Image(); im.alt = `Foto do ponto P${String(p.n).padStart(2,"0")}`; im.src = src; im.onerror = () => { el.textContent = "foto indisponível"; }; el.appendChild(im); }
+    else if (p.foto || p.fotoPend) el.textContent = "foto indisponível";
+  }
+}
+function ponto(n){
+  draft.pontos = draft.pontos || [];
+  let p = draft.pontos.find(x => x.n === n);
+  if (!p){ p = {n}; draft.pontos.push(p); draft.pontos.sort((a,b) => a.n - b.n); }
+  return p;
+}
+
+// ---------- Eventos ----------
+document.addEventListener("click", async (ev) => {
+  const b = ev.target.closest("[data-act]"); if (!b) return;
+  const a = b.dataset.act;
+  if (a === "home") return goHome();
+  if (a === "flush"){ if (dbState === "local"){ toast("Modo local: os dados ficam neste aparelho. Use Exportar planilha para consolidar.", 5000); return; } if (Object.keys(pending).length) { flush(); toast("Enviando o que está no aparelho…"); } return; }
+  if (a === "open") return openArea(b.dataset.id);
+  if (a === "new"){ newForm = true; renderList(); return; }
+  if (a === "cancelnew"){ newForm = false; renderList(); return; }
+  if (a === "filtro"){ ui.filtro = b.dataset.v; saveUI(); renderList(); return; }
+  if (a === "tab"){ commitNow(); ui.tab = b.dataset.v; saveUI(); renderArea(); return; }
+  if (a === "reload"){ const r = areas[ui.id]; if (r){ draft = clone(r); remoteNewer = false; renderArea(); } return; }
+  if (a === "score"){
+    const path = b.dataset.f, v = +b.dataset.v;
+    const cur = getPath(draft, path);
+    const nv = cur === v ? null : v;
+    setPath(draft, path, nv);
+    b.parentElement.querySelectorAll("button").forEach(x => x.setAttribute("aria-pressed", String(+x.dataset.v === nv)));
+    const ck = path.startsWith("diag.") && !path.includes("riscos") ? path.slice(5) : null;
+    if (ck){ const c = CRITS.find(x => x.k === ck); const el = $("#rule-" + ck); if (el) el.innerHTML = nv ? `<b>${nv}</b> · ${esc(c.niveis[nv-1])}` : "Toque na nota para ver a régua."; }
+    touch(); updateHead(); return;
+  }
+  if (a === "gps"){
+    const tgt = b.dataset.target;
+    if (!navigator.geolocation){ toast("GPS indisponível nesta tela. Digite ou cole a coordenada."); return; }
+    b.disabled = true; b.textContent = "…";
+    navigator.geolocation.getCurrentPosition(pos => {
+      const lat = +pos.coords.latitude.toFixed(6), lon = +pos.coords.longitude.toFixed(6);
+      if (tgt === "area"){ draft.lat = lat; draft.lon = lon; } else { const p = ponto(+tgt); p.lat = lat; p.lon = lon; }
+      touch(); renderArea(); toast(`Coordenada registrada (precisão ~${Math.round(pos.coords.accuracy)} m)`);
+    }, () => {
+      b.disabled = false; b.textContent = tgt === "area" ? "Usar GPS" : "GPS";
+      toast("Não consegui ler o GPS nesta tela. Digite ou cole a coordenada (ex.: -2.5307, -44.3068).", 5200);
+    }, {enableHighAccuracy:true, timeout:15000, maximumAge:30000});
+    return;
+  }
+  if (a === "cam" || a === "gal"){ pickN = +b.dataset.n; const f = $(a === "cam" ? "#fileCam" : "#fileGal"); f.value = ""; f.click(); return; }
+  if (a === "addpt"){ const e = evid(draft); const n = Math.max(e?.N || 0, ...(draft.pontos || []).map(p => p.n), 0) + 1; ponto(n); touch(); renderArea(); return; }
+  if (a === "del"){ confirmDel = true; renderArea(); return; }
+  if (a === "delno"){ confirmDel = false; renderArea(); return; }
+  if (a === "delyes") return deleteArea(ui.id);
+  if (a === "import"){ const f = $("#fileImp"); f.value = ""; f.click(); return; }
+  if (a === "xlsx") return exportXlsx();
+  if (a === "zip") return exportZip();
+});
+document.addEventListener("submit", (ev) => {
+  if (ev.target.id !== "newf") return;
+  ev.preventDefault();
+  const id = ($("#n-id").value || "").trim().toUpperCase().replace(/\s+/g, "-");
+  const nome = ($("#n-nome").value || "").trim();
+  if (!/^[A-Z0-9_.~:@+\-]+$/.test(id) || id === "." || id === ".."){ toast("Use só letras, números, hífen, ponto ou sublinhado no ID."); return; }
+  if (deleted.has(id)){ deleted.delete(id); saveDeleted(); }
+  if (getRec(id)){ toast(`Já existe a área ${id}. Abrindo.`); newForm = false; return openArea(id); }
+  const r = blankRec(id, nome);
+  queue(r); newForm = false; openArea(id);
+});
+document.addEventListener("input", (ev) => {
+  const t = ev.target;
+  if (t.id === "q"){ ui.q = t.value; saveUI(); const pos = t.selectionStart; renderList(); const q = $("#q"); if (q){ q.focus(); try { q.setSelectionRange(pos, pos); } catch {} } return; }
+  if (!draft) return;
+  if (t.dataset.f){
+    const path = t.dataset.f;
+    let v = t.value;
+    if (["area_m2","extensao_m","interfaces","periodicidade_atual","hist.rocadas12","hist.retrab","hist.reinc","hist.reclam","hist.nc","hist.diasRuim"].includes(path)) v = num(v);
+    setPath(draft, path, v);
+    if (path === "diag.avaliador") LS.set("rocada.avaliador", t.value);
+    touch();
+    if (t.tagName === "SELECT" || path === "nome"){ if (path === "geometria") renderArea(); else updateHead(); }
+    else if (["area_m2","extensao_m","interfaces"].includes(path)) updateHead();
+    if (path.startsWith("hist.")){ const el = $("#histscore"); const hs = histScore(draft.hist); if (el) el.innerHTML = `Nota histórica: <b>${hs.s}</b>${hs.neutro ? " (neutra, sem dados)" : ""}`; updateHead(); }
+    return;
+  }
+  if (t.dataset.pf){ const p = ponto(+t.dataset.n); p[t.dataset.pf] = t.value; touch(); return; }
+});
+document.addEventListener("change", (ev) => {
+  const t = ev.target;
+  if (t.id === "fsetor"){ ui.setor = t.value; saveUI(); renderList(); return; }
+  if (t.dataset.coord && draft){
+    const c = parseCoord(t.value);
+    if (!c && t.value.trim()){ toast("Coordenada não reconhecida. Use: -2.530700, -44.306800"); return; }
+    if (t.dataset.coord === "area"){ draft.lat = c?.lat ?? null; draft.lon = c?.lon ?? null; }
+    else { const p = ponto(+t.dataset.coord); p.lat = c?.lat ?? null; p.lon = c?.lon ?? null; }
+    t.value = c ? coordStr(c.lat, c.lon) : "";
+    touch(); if (t.dataset.coord === "area") renderArea();
+  }
+});
+
+// ---------- Fotos ----------
+let pickN = null;
+async function onPhoto(ev){
+  const file = ev.target.files?.[0]; if (!file || !draft || pickN == null) return;
+  const n = pickN, id = draft.id, nn = String(n).padStart(2,"0");
+  const el = $("#ph-" + n); if (el) el.textContent = "processando…";
+  try {
+    const gps = exifGps(await file.slice(0, 256*1024).arrayBuffer());
+    const p = ponto(n);
+    if (gps && (p.lat == null || p.lon == null)){ p.lat = +gps.lat.toFixed(6); p.lon = +gps.lon.toFixed(6); }
+    const now = new Date();
+    const stamp = `${id} · P${nn} · ${now.toLocaleDateString("pt-BR")} ${now.toLocaleTimeString("pt-BR", {hour:"2-digit", minute:"2-digit"})}${p.lat != null ? " · " + coordStr(p.lat, p.lon) : ""}`;
+    const blob = await prepPhoto(file, stamp);
+    if (!blob) throw new Error("foto");
+    const key = id + "|" + n;
+    const ok = await idbPut(key, blob);
+    if (blobURLs[key]){ URL.revokeObjectURL(blobURLs[key]); delete blobURLs[key]; }
+    if (!ok){
+      if (!assets) throw new Error("sem armazenamento");
+      const up = await assets.upload(blob, {type:"image/jpeg"});
+      p.foto = up.id; p.fotoPend = false;
+    } else { p.fotoPend = true; }
+    p.data = now.toISOString();
+    touch(); commitNow(); renderArea();
+    toast(gps ? `Foto do P${nn} salva com o GPS da foto` : `Foto do P${nn} salva`);
+  } catch (e) {
+    if (el) el.textContent = "sem foto";
+    toast("Não consegui processar a foto. Tente de novo ou escolha da galeria.");
+  }
+}
+$("#fileCam").addEventListener("change", onPhoto);
+$("#fileGal").addEventListener("change", onPhoto);
+
+// ---------- Excluir ----------
+async function deleteArea(id){
+  const r = getRec(id);
+  try {
+    if (db) await db.doc("areas/" + id).delete();
+    else if (dbState === "local") { deleted.add(id); saveDeleted(); }
+    else if (areas[id]) throw new Error("offline");
+  } catch { toast("Não consegui excluir agora. Tente com conexão."); return; }
+  for (const p of (r?.pontos || [])){
+    if (p.foto && assets){ try { await assets.delete(p.foto); } catch {} }
+    await idbDel(id + "|" + p.n);
+  }
+  delete pending[id]; savePending(); delete areas[id];
+  toast(`Área ${id} excluída`);
+  draft = null; ui.view = "lista"; ui.id = null; saveUI(); renderTop(); renderList();
+}
+
+// ---------- Bibliotecas sob demanda ----------
+const loaded = {};
+function loadScript(src){
+  if (loaded[src]) return loaded[src];
+  loaded[src] = new Promise((res, rej) => { const s = document.createElement("script"); s.src = src; s.onload = res; s.onerror = () => { delete loaded[src]; rej(new Error("load")); }; document.head.appendChild(s); });
+  return loaded[src];
+}
+const XLSX_URL = "https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js";
+const ZIP_URL = "https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js";
+async function saveFile(filename, data){
+  if (!downloads){
+    if (!STANDALONE){ toast("Esta tela não permite baixar arquivos."); return; }
+    try {
+      const url = URL.createObjectURL(data instanceof Blob ? data : new Blob([data]));
+      const a = document.createElement("a"); a.href = url; a.download = filename; document.body.appendChild(a); a.click(); a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 30000);
+      toast("Arquivo baixado: " + filename);
+    } catch { toast("Não foi possível baixar o arquivo."); }
+    return;
+  }
+  try { await downloads.save({filename, data}); toast("Arquivo pronto"); }
+  catch (e) { if (e?.code === "declined") toast("Download cancelado"); else if (e?.code === "rate_limited") toast("Já há um download aguardando confirmação."); else toast("Não foi possível baixar o arquivo aqui."); }
+}
+const isoToDate = s => s ? new Date(+s.slice(0,4), +s.slice(5,7)-1, +s.slice(8,10)) : "";
+
+// ---------- Exportar planilha ----------
+async function exportXlsx(){
+  commitNow();
+  busy = "xlsx"; renderList();
+  try {
+    await loadScript(XLSX_URL);
+    const X = window.XLSX;
+    const recs = allIds().map(getRec);
+    const base = [["ID da área","Código SAP / Local de instalação","Nome da área","Descrição","Localização (referência)","Setor / Região","Latitude","Longitude","Área total (m²)","Geometria","Extensão linear (m) — se Linear","Tipo de área","Tipo de vegetação","Terreno / acesso","Método predominante","Interfaces críticas (qtd)","Periodicidade ATUAL (dias)","Aplicar sazonalidade?","Situação atual","Observações"]];
+    const diag = [["ID da área","Nome (automático)","Tipo de área (automático)","Data do diagnóstico","Avaliador","Velocidade de crescimento (1–5)","Criticidade operacional (1–5)","Sensibilidade climática (1–5)","Condição atual (1–5)",...RISKS.map(x => "Risco: " + x.nome.toLowerCase()),"PONTUAÇÃO DE RISCO (1–5)","Observações do diagnóstico"]];
+    const hist = [["ID da área","Nome (automático)","Data da última roçada","Dias desde a última roçada","Roçadas nos últimos 12 meses","Intervalo médio histórico (dias)","Retrabalhos (12m)","Reincidências (12m)","Reclamações (12m)","Não conformidades (12m)","Dias após a roçada até atingir condição 4 – Ruim","Período em que foi observado","Observações","Ocorrências totais","PONTUAÇÃO HISTÓRICA (1–5)"]];
+    const pts = [["ID da área","Nome da área","Ponto","Latitude","Longitude","Direção da foto","Referência fixa","Arquivo da foto (no .zip)","Foto enviada?","Registrada em"]];
+    const prev = [["ID da área","Nome da área","Área (m²)","Índice (0–100)","Classe (prévia)","Regra aplicada","Ciclo chuvoso (d)","Ciclo base (d)","Ciclo seco (d)","Pontos de evidência","Fotos por OM","Falta preencher"]];
+    const V = x => x == null ? "" : x;
+    for (const r of recs){
+      base.push([r.id, r.sap, r.nome, r.descricao, r.localizacao, r.setor, V(r.lat), V(r.lon), V(num(r.area_m2)), r.geometria, V(num(r.extensao_m)), r.tipo_area, r.vegetacao, r.terreno, r.metodo, V(num(r.interfaces)), V(num(r.periodicidade_atual)), r.sazonalidade, r.situacao, r.obs]);
+      const d = r.diag || {};
+      if (diagState(r) !== "none" || d.avaliador){
+        diag.push([r.id, r.nome, r.tipo_area, isoToDate(d.data), d.avaliador || "", V(d.cresc), V(d.crit), V(d.clima), V(d.cond), ...RISKS.map(x => V(d.riscos?.[x.k])), V(riskScore(d)), d.obs || ""]);
+      }
+      const h = r.hist || {}, hs = histScore(h);
+      if (!hs.neutro || h.obs){
+        const ult = h.ultima ? isoToDate(h.ultima) : "";
+        const n12 = num(h.rocadas12);
+        hist.push([r.id, r.nome, ult, ult ? Math.floor((Date.now() - ult.getTime())/864e5) : "", V(n12), n12 ? Math.round(365/n12) : "", V(num(h.retrab)), V(num(h.reinc)), V(num(h.reclam)), V(num(h.nc)), V(num(h.diasRuim)), h.periodo || "", h.obs || "", hs.ocorr ?? "", hs.s]);
+      }
+      for (const p of (r.pontos || [])){
+        const nn = String(p.n).padStart(2,"0");
+        const has = p.foto || p.fotoPend;
+        pts.push([r.id, r.nome, "P" + nn, V(p.lat), V(p.lon), p.dir || "", p.ref || "", has ? `${r.id}_P${nn}_REF.jpg` : "", p.foto ? "Sim" : p.fotoPend ? "Só no aparelho" : "", p.data ? new Date(p.data) : ""]);
+      }
+      const c = calc(r), e = evid(r);
+      prev.push([r.id, r.nome, V(num(r.area_m2)), c.ok ? c.idx : "", c.ok ? c.cls : "", c.ok ? (c.regra || "") : "", c.ok ? c.cyc[0] : "", c.ok ? c.cyc[1] : "", c.ok ? c.cyc[2] : "", e ? e.N : "", e ? e.fotos : "", [...cadMiss(r), ...(c.ok ? [] : c.miss)].join(", ")]);
+    }
+    const leia = [
+      ["Exportação do app Vistoria de Roçada — " + new Date().toLocaleString("pt-BR")],
+      [""],
+      ["Como levar para a planilha Diagnostico_Rocada_Sistematica_SAP_PM.xlsx (as colunas têm a mesma ordem):"],
+      ["BASE_AREAS: copie as linhas de dados (colunas A a T) e cole a partir da linha 5 da aba BASE_AREAS."],
+      ["DIAGNOSTICO: cole a coluna A (ID) e o bloco D a R (data, avaliador e as 13 notas) a partir da linha 5. As colunas B, C e S da planilha são fórmulas: não cole por cima. A coluna T (observações) pode ser colada."],
+      ["HISTORICO: cole as colunas A, C, E e G a M. As colunas B, D, F, N e O da planilha são fórmulas."],
+      ["PONTOS_EVIDENCIA: pontos fixos de cada área, com coordenada, direção e o nome do arquivo da foto no .zip."],
+      ["PREVIA_CLASSE: classe calculada no app com os parâmetros iniciais. A classe oficial é a da planilha, depois da validação."]
+    ];
+    const wb = X.utils.book_new();
+    const add = (aoa, name, widths) => { const ws = X.utils.aoa_to_sheet(aoa, {cellDates:true, dateNF:"dd/mm/yyyy"}); if (widths) ws["!cols"] = widths.map(w => ({wch:w})); X.utils.book_append_sheet(wb, ws, name); };
+    add(leia, "LEIA_ME", [120]);
+    add(base, "BASE_AREAS", [12,22,30,30,24,12,11,11,12,11,13,26,26,22,28,10,12,10,13,30]);
+    add(diag, "DIAGNOSTICO", [12,30,24,12,16,...Array(13).fill(10),12,30]);
+    add(hist, "HISTORICO", [12,30,12,10,10,10,10,10,10,10,13,12,26,10,12]);
+    add(pts, "PONTOS_EVIDENCIA", [12,30,7,11,11,9,24,26,14,18]);
+    add(prev, "PREVIA_CLASSE", [12,30,11,10,9,9,9,9,9,10,10,36]);
+    const buf = X.write(wb, {bookType:"xlsx", type:"array", cellDates:true});
+    const stamp = today().replace(/-/g, "");
+    await saveFile(`vistoria_rocada_${stamp}.xlsx`, new Blob([buf]));
+  } catch (e) {
+    toast("Não consegui gerar a planilha. Verifique a conexão e tente de novo.");
+  } finally { busy = ""; renderList(); }
+}
+
+// ---------- Exportar fotos ----------
+async function exportZip(){
+  commitNow();
+  busy = "zip"; renderList();
+  try {
+    await loadScript(ZIP_URL);
+    const zip = new window.JSZip();
+    let n = 0, falhas = 0;
+    const lines = ["arquivo;id_area;ponto;latitude;longitude;direcao;referencia"];
+    for (const id of allIds()){
+      const r = getRec(id);
+      for (const p of (r.pontos || [])){
+        if (!p.foto && !p.fotoPend) continue;
+        const nn = String(p.n).padStart(2,"0");
+        let blob = p.fotoPend ? await idbGet(id + "|" + p.n) : null;
+        if (!blob && p.foto){ try { const rs = await fetch("/_blob/" + p.foto); if (rs.ok) blob = await rs.blob(); } catch {} }
+        const fname = `${id}_P${nn}_REF.jpg`;
+        if (!blob){ falhas++; continue; }
+        zip.file(`${r.setor ? r.setor.replace(/[^\w.-]+/g,"_") + "/" : ""}${fname}`, blob);
+        lines.push([fname, id, "P" + nn, p.lat ?? "", p.lon ?? "", p.dir || "", (p.ref || "").replace(/;/g, ",")].join(";"));
+        n++;
+      }
+    }
+    if (!n){ toast("Ainda não há fotos para exportar."); return; }
+    zip.file("indice_fotos.csv", "﻿" + lines.join("\r\n"));
+    const blob = await zip.generateAsync({type:"blob"});
+    await saveFile(`fotos_pontos_rocada_${today().replace(/-/g,"")}.zip`, blob);
+    if (falhas) toast(`${falhas} foto(s) não puderam ser lidas e ficaram fora do .zip.`, 5000);
+  } catch {
+    toast("Não consegui gerar o .zip. Verifique a conexão e tente de novo.");
+  } finally { busy = ""; renderList(); }
+}
+
+// ---------- Importar cadastro ----------
+const norm = s => String(s ?? "").normalize("NFD").replace(/[̀-ͯ]/g, "").toLowerCase().replace(/\s+/g, " ").trim();
+const MAP = [
+  ["id", /^id\b|id da area|^codigo da area/], ["sap", /sap|local de instal/], ["tipo_area", /tipo de area/], ["vegetacao", /vegeta/],
+  ["extensao_m", /extens/], ["area_m2", /area total|m²|\(m2\)|^area$|metragem|area \(m/], ["nome", /^nome|nome da area/],
+  ["descricao", /descri/], ["localizacao", /localiza/], ["setor", /setor|regiao/], ["lat", /latitude|^lat$/], ["lon", /longitude|^lon/],
+  ["geometria", /geometr/], ["terreno", /terreno|acesso/], ["metodo", /metodo/], ["interfaces", /interfac/],
+  ["periodicidade_atual", /periodicidade|frequencia/], ["sazonalidade", /sazonal/], ["situacao", /situa/], ["obs", /observ/]
+];
+$("#fileImp").addEventListener("change", async (ev) => {
+  const file = ev.target.files?.[0]; if (!file) return;
+  toast("Lendo o arquivo…");
+  try {
+    await loadScript(XLSX_URL);
+    const X = window.XLSX;
+    const wb = X.read(await file.arrayBuffer(), {type:"array", cellDates:true});
+    const sh = wb.Sheets["BASE_AREAS"] || wb.Sheets[wb.SheetNames[0]];
+    const rows = X.utils.sheet_to_json(sh, {header:1, defval:"", raw:true});
+    let hi = rows.findIndex(r => r.some(c => /^id\b|id da area/.test(norm(c))));
+    if (hi < 0){ toast("Não encontrei a coluna de ID da área no arquivo."); return; }
+    const head = rows[hi].map(norm), col = {};
+    head.forEach((h, i) => { if (!h) return; for (const [k, re] of MAP){ if (col[k] == null && re.test(h)){ col[k] = i; break; } } });
+    let novas = 0, existentes = 0, invalidas = 0, exemplos = 0;
+    const lista = [];
+    for (const row of rows.slice(hi + 1)){
+      let id = String(row[col.id] ?? "").trim().toUpperCase().replace(/\s+/g, "-");
+      if (!id) continue;
+      if (!/^[A-Z0-9_.~:@+\-]+$/.test(id)){ invalidas++; continue; }
+      if (sh === wb.Sheets["BASE_AREAS"] && /^EX-\d{3}$/.test(id)){ exemplos++; continue; }
+      if (getRec(id)){ existentes++; continue; }
+      const r = blankRec(id, "");
+      const g = k => col[k] == null ? "" : row[col[k]];
+      ["sap","nome","descricao","localizacao","setor","geometria","tipo_area","vegetacao","terreno","metodo","sazonalidade","situacao","obs"].forEach(k => { const v = g(k); if (v !== "" && v != null) r[k] = String(v).trim(); });
+      ["area_m2","extensao_m","interfaces","periodicidade_atual","lat","lon"].forEach(k => { const v = num(g(k)); if (v != null) r[k] = v; });
+      if (!["Poligonal","Linear"].includes(r.geometria)) r.geometria = num(r.extensao_m) ? "Linear" : "Poligonal";
+      lista.push(r);
+    }
+    for (const r of lista){ ver += 1; const x = clone(r); x._v = ver; pending[r.id] = x; novas++; }
+    savePending(); renderList(); flush();
+    toast(`${novas} área(s) importada(s)${existentes ? `, ${existentes} já existiam e ficaram como estavam` : ""}${invalidas ? `, ${invalidas} com ID inválido` : ""}${exemplos ? `, ${exemplos} linhas de exemplo (EX-###) ignoradas` : ""}.`, 6000);
+  } catch {
+    toast("Não consegui ler o arquivo. Use .xlsx ou .csv com uma linha de cabeçalho.");
+  }
+});
+
+// ---------- Banco compartilhado ----------
+function onAreas(snap){
+  const next = {};
+  snap.docs.forEach(d => { next[d.id] = d.data(); });
+  areas = next; dbState = "ok"; renderSync();
+  if (ui.view === "lista") { if (!document.activeElement || document.activeElement.id !== "q") renderList(); }
+  else if (ui.view === "area" && draft){
+    const rem = areas[ui.id];
+    if (!rem && !pending[ui.id] && !saveT){ /* excluída por outra pessoa */ draft = null; renderArea(); return; }
+    if (rem && !pending[ui.id] && !saveT && rem.meta?.atualizado && draft.meta?.atualizado && rem.meta.atualizado > draft.meta.atualizado && rem.meta.por !== myId){
+      if (!remoteNewer){ remoteNewer = true; renderArea(); }
+    } else if (rem && !pending[ui.id] && !saveT && rem.meta?.atualizado === draft.meta?.atualizado){
+      const s = $("#savedmsg"); if (s) s.textContent = "Enviado";
+    }
+  }
+}
+async function boot(){
+  renderTop();
+  if (ui.view === "area" && ui.id && getRec(ui.id)) openArea(ui.id); else { ui.view = "lista"; renderList(); }
+  const C = window.claude;
+  if (STANDALONE){
+    try {
+      const rs = await fetch("data/areas.json", {cache: "no-cache"});
+      if (rs.ok){ const lista = await rs.json(); const m = {}; lista.forEach(r => { if (r && r.id) m[r.id] = r; }); areas = m; }
+    } catch {}
+    renderSync();
+    if (ui.view === "lista") renderList(); else if (ui.view === "area" && !draft && getRec(ui.id)) openArea(ui.id);
+    if ("serviceWorker" in navigator && location.protocol === "https:"){ navigator.serviceWorker.register("sw.js").catch(() => {}); }
+    return;
+  }
+  const [d, u, a, dl] = await Promise.all([C.use("db"), C.use("user"), C.use("assets"), C.use("downloads")].map(p => p.catch(() => null)));
+  db = d; user = u; assets = a; downloads = dl;
+  if (user){ try { myId = await user.id(); } catch {} try { const w = await user.can("data.write"); if (w === false) readOnly = true; } catch {} }
+  if (!db){ dbState = "none"; renderSync(); if (ui.view === "lista") renderList(); return; }
+  db.collection("areas").onSnapshot(onAreas, () => { dbState = "none"; renderSync(); });
+  flush();
+}
+boot();
+})();
+</script>
+</body>
+</html>
